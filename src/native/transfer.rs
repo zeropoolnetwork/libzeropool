@@ -1,16 +1,19 @@
-use fawkes_crypto::native::num::Num;
-use fawkes_crypto::native::poseidon::{PoseidonParams, poseidon, MerkleProof, poseidon_with_salt};
-use fawkes_crypto::native::ecc::{JubJubParams};
+use fawkes_crypto::native::{
+    num::Num, ecc::JubJubParams,
+    poseidon::{PoseidonParams, poseidon, MerkleProof, poseidon_with_salt}
+};
 
-use fawkes_crypto::core::sizedvec::SizedVec;
-
-use fawkes_crypto::core::field::Field;
+use fawkes_crypto::core::{
+    sizedvec::SizedVec,
+    field::Field
+};
 use num::bigint::{BigUint, BigInt, ToBigInt};
 use typenum::Unsigned;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use crate::constants::{SEED_DIVERSIFIER, SEED_DECRYPTION_KEY, SEED_IN_NOTE_HASH, SEED_OUT_NOTE_HASH, SEED_TX_HASH, SEED_NULLIFIER, SEED_NOTE_HASH};
 
+use bellman::pairing::bn256::Fr;
 
 pub trait PoolParams : Clone+Sized {
     type F: Field;
@@ -29,19 +32,19 @@ pub trait PoolParams : Clone+Sized {
 }
 
 #[derive(Clone)]
-pub struct PoolBN256<F:Field, J:JubJubParams<Fr=F>, IN:Unsigned, OUT:Unsigned, H:Unsigned>{
+pub struct PoolBN256<J:JubJubParams<Fr=Fr>, IN:Unsigned, OUT:Unsigned, H:Unsigned>{
     pub jubjub:J,
-    pub hash: PoseidonParams<F>,
-    pub compress: PoseidonParams<F>,
-    pub note: PoseidonParams<F>,
-    pub tx_in: PoseidonParams<F>,
-    pub tx_out: PoseidonParams<F>,
-    pub eddsa: PoseidonParams<F>,
+    pub hash: PoseidonParams<Fr>,
+    pub compress: PoseidonParams<Fr>,
+    pub note: PoseidonParams<Fr>,
+    pub tx_in: PoseidonParams<Fr>,
+    pub tx_out: PoseidonParams<Fr>,
+    pub eddsa: PoseidonParams<Fr>,
     pub phantom: PhantomData<(IN, OUT, H)>
 }
 
-impl<F:Field, J:JubJubParams<Fr=F>, IN:Unsigned, OUT:Unsigned, H:Unsigned> PoolParams for PoolBN256<F,J,IN, OUT, H> {
-    type F = F;
+impl<J:JubJubParams<Fr=Fr>, IN:Unsigned, OUT:Unsigned, H:Unsigned> PoolParams for PoolBN256<J,IN, OUT, H> {
+    type F = Fr;
     type J = J;
     type IN = IN;
     type OUT = OUT;

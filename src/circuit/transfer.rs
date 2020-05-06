@@ -1,18 +1,15 @@
 use typenum::Unsigned;
 
-use fawkes_crypto::core::signal::Signal;
-use fawkes_crypto::core::cs::{ConstraintSystem, Circuit};
-use fawkes_crypto::core::field::{PrimeField};
-use fawkes_crypto::core::sizedvec::SizedVec;
-use fawkes_crypto::circuit::num::CNum;
-use fawkes_crypto::circuit::bool::CBool;
-use fawkes_crypto::circuit::poseidon::{c_poseidon, c_poseidon_with_salt, c_poseidon_merkle_proof_root, c_poseidon_merkle_tree_root, CMerkleProof};
-use fawkes_crypto::circuit::eddsaposeidon::{c_eddsaposeidon_verify};
-use fawkes_crypto::circuit::ecc::{CEdwardsPoint};
-use fawkes_crypto::circuit::bitify::{c_comp_constant, c_into_bits_le, c_into_bits_le_strict, c_from_bits_le};
-use fawkes_crypto::native::num::Num;
-use fawkes_crypto::native::ecc::{JubJubParams};
-use fawkes_crypto::native::poseidon::{MerkleProof};
+use fawkes_crypto::core::{signal::Signal, cs::ConstraintSystem, field::PrimeField, sizedvec::SizedVec};
+use fawkes_crypto::circuit::{
+    num::CNum, bool::CBool,
+    poseidon::{c_poseidon_with_salt, c_poseidon_merkle_proof_root, c_poseidon_merkle_tree_root, CMerkleProof},
+    eddsaposeidon::{c_eddsaposeidon_verify},
+    ecc::CEdwardsPoint,
+    bitify::{c_comp_constant, c_into_bits_le, c_into_bits_le_strict, c_from_bits_le}
+};
+use fawkes_crypto::native::{num::Num, ecc::JubJubParams};
+
 
 
 use crate::native::transfer::{PoolParams, Note, TxPub, TxSec};
@@ -27,13 +24,6 @@ pub struct CNote<'a, CS:ConstraintSystem> {
     pub id: CNum<'a, CS>,
     pub st: CNum<'a, CS>
 }
-
-
-// pub struct Test<P:PoolParams<F=F>> {
-//     a: P::F,
-//     b: P
-// }
-
 
 
 #[derive(Clone, Signal)]
@@ -158,14 +148,14 @@ pub fn c_tx<'a, CS:ConstraintSystem, P:PoolParams<F=CS::F>>(
     //build merkle proofs
     for i in 0..P::IN::USIZE {
         let cur_root = c_poseidon_merkle_proof_root(&in_hash[i], &s.in_proof[i], params.compress());
-        ((cur_root-p.root)*&s.in_note[i].v).assert_zero();
+        ((cur_root-&p.root)*&s.in_note[i].v).assert_zero();
     }
 
     //bind msg_hash to the circuit
-    (p.memo+Num::one()).assert_nonzero();
+    (&p.memo+Num::one()).assert_nonzero();
 
     //build out hash root
-    (p.out_note_hash_root-c_poseidon_merkle_tree_root(&p.out_hash.0, params.compress())).assert_zero();
+    (&p.out_note_hash_root-c_poseidon_merkle_tree_root(&p.out_hash.0, params.compress())).assert_zero();
 
     //build tx hash
     let tx_hash = c_tx_hash(&in_hash, &p.out_hash.0, params);
@@ -181,7 +171,7 @@ pub fn c_tx<'a, CS:ConstraintSystem, P:PoolParams<F=CS::F>>(
     (g.mul(&t_dk_bits, params.jubjub()).x - g.mul(&dk_bits, params.jubjub()).x).assert_zero();
 
     //parse delta    
-    let (token_amount, token_id, native_amount) = c_parse_delta(p.delta);
+    let (token_amount, token_id, native_amount) = c_parse_delta(&p.delta);
 
     let token_note = CNote{d:CNum::zero(cs), pk_d:CNum::zero(cs), v:token_amount, id:token_id, st:CNum::zero(cs)};
     let native_note = CNote{d:CNum::zero(cs), pk_d:CNum::zero(cs), v:native_amount, id:CNum::zero(cs), st:CNum::zero(cs)};

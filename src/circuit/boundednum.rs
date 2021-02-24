@@ -3,7 +3,7 @@ use crate::fawkes_crypto::typenum::Unsigned;
 use crate::fawkes_crypto::circuit::{
     bitify::{c_into_bits_le},
     bool::CBool,
-    num::CNum
+    num::CNum,
 };
 use crate::fawkes_crypto::core::{
     signal::Signal, 

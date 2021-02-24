@@ -1,11 +1,13 @@
 use crate::{
     fawkes_crypto::{
-        ff_uint::Num,
-        borsh::{BorshSerialize, BorshDeserialize}
+        ff_uint::{Num, PrimeFieldParams},
+        borsh::{BorshSerialize, BorshDeserialize},
+        native::ecc::EdwardsPoint
     },
     native::{
         boundednum::BoundedNum,
-        params::PoolParams
+        params::PoolParams,
+        tx::derive_key_pk_d
     },
     constants
 };
@@ -14,6 +16,7 @@ use crate::{
 
 use std::fmt::Debug;
 use std::io::{self, Write};
+use sha3::{Digest, Keccak256};
 
 
 
@@ -76,3 +79,6 @@ impl<P:PoolParams> fawkes_crypto::rand::distributions::Distribution<Note<P>>
         }
     }
 }
+
+
+

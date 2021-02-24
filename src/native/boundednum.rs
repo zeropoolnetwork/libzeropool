@@ -8,6 +8,7 @@ use crate::fawkes_crypto::{
 use std::marker::PhantomData;
 use std::io::{Write, self};
 
+
 #[derive(Clone, Debug)]
 pub struct BoundedNum<Fr:PrimeField, L:Unsigned>(Num<Fr>, PhantomData<L>);
 

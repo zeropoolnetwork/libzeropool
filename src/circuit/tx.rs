@@ -1,6 +1,6 @@
 use crate::fawkes_crypto::typenum::{Unsigned};
 use crate::fawkes_crypto::circuit::{
-    bitify::{c_comp_constant, c_into_bits_le, c_into_bits_le_strict},
+    bitify::{c_comp_constant, c_into_bits_le, c_into_bits_le_strict, c_comp, c_from_bits_le},
     bool::CBool,
     ecc::CEdwardsPoint,
     eddsaposeidon::c_eddsaposeidon_verify,
@@ -14,7 +14,6 @@ use crate::fawkes_crypto::native::{ecc::JubJubParams};
 use crate::fawkes_crypto::ff_uint::{Num, NumRepr, PrimeField, PrimeFieldParams};
 use crate::fawkes_crypto::circuit::cs::RCS;
 use crate::circuit::{
-    boundednum::CBoundedNum,
     account::CAccount,
     note::CNote
 };
@@ -52,7 +51,7 @@ pub struct CTx<P: PoolParams> {
 #[Field = "P::Fr"]
 pub struct CTransferSec<P:PoolParams> {
     pub tx: CTx<P>,
-    pub in_proof: SizedVec<CMerkleProof<P::Fr, constants::H>, constants::INPROOF>,
+    pub in_proof: (CMerkleProof<P::Fr, constants::H>, SizedVec<CMerkleProof<P::Fr, constants::H>, constants::IN>),
     pub eddsa_s: CNum<P::Fr>,
     pub eddsa_r: CNum<P::Fr>,
     pub eddsa_a: CNum<P::Fr>,
@@ -87,9 +86,7 @@ pub fn c_note_hash<P: PoolParams>(
 }
 
 pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<P::Fr> {
-    let mut inputs = vec![ac.xsk.clone()];
-    inputs.extend(ac.interval.iter().map(|n| n.as_num().clone() ));
-    inputs.extend(vec![ac.v.as_num().clone(), ac.st.as_num().clone()]);
+    let inputs = vec![ac.xsk.clone(), ac.interval.as_num().clone(), ac.v.as_num().clone(), ac.st.as_num().clone()];
     c_poseidon(
         &inputs,
         params.account(),
@@ -166,8 +163,6 @@ pub fn c_transfer<P:PoolParams>(
     s: &CTransferSec<P>,
     params: &P,
 ) {
-    let cs = p.get_cs();
-
     //build input hashes
     let account_hash = c_accout_hash(&s.tx.input.0, params);
     let note_hash = s.tx.input.1.iter().map(|n| c_note_hash(n, params)).collect::<Vec<_>>();
@@ -201,18 +196,27 @@ pub fn c_transfer<P:PoolParams>(
 
     //build merkle proofs
     {
-        let cur_root = c_poseidon_merkle_proof_root(&account_hash, &s.in_proof[0], params.compress());
-        let mut is:CNum<P::Fr> = s.derive_const(&Num::ZERO);
-        for it in s.tx.input.0.interval.iter() {
-            is += it.as_num();
-        }
-        //root is correct or value==0 && interval is zero set && salt is zero 
-        ((cur_root - &p.root) * (s.tx.input.0.v.as_num()+s.tx.input.0.st.as_num()+is)).assert_zero();
+        let cur_root = c_poseidon_merkle_proof_root(&account_hash, &s.in_proof.0, params.compress());
+        //root is correct or value==0 && interval==0 && salt is zero 
+        ((cur_root - &p.root) * (s.tx.input.0.v.as_num()+s.tx.input.0.st.as_num()+s.tx.input.0.interval.as_num())).assert_zero();
+
+        //input.interval <= output.interval
+        c_comp(s.tx.input.0.interval.as_num(), s.tx.output.0.interval.as_num(), constants::H::USIZE).assert_const(&false);
     }
 
+    //let account_index = c_from_bits_le(s.in_proof.0.path.as_slice());
+
     for i in 0..constants::IN::USIZE {
-        let cur_root = c_poseidon_merkle_proof_root(&note_hash[i], &s.in_proof[i+1], params.compress());
-        ((cur_root - &p.root) * s.tx.input.1[i].v.as_num()).assert_zero();
+        let note_value = s.tx.input.1[i].v.as_num();
+        let ref note_index = c_from_bits_le(s.in_proof.1[i].path.as_slice());
+
+        let cur_root = c_poseidon_merkle_proof_root(&note_hash[i], &s.in_proof.1[i], params.compress());
+        ((cur_root - &p.root) * note_value).assert_zero();
+
+        //note_index >= account_in.interval && note_index < account_out.interval || note_index == 0 && value == 0
+        ((c_comp(s.tx.input.0.interval.as_num(), note_index, constants::H::USIZE).as_num() + Num::ONE -
+        c_comp(s.tx.output.0.interval.as_num(), note_index, constants::H::USIZE).as_num()) *
+        (note_index+note_value)).assert_const(&Num::ZERO);
     }
 
     //bind msg_hash to the circuit
@@ -238,6 +242,5 @@ pub fn c_transfer<P:PoolParams>(
     amount -= s.tx.output.0.v.as_num() + s.tx.output.1.v.as_num();
     amount.assert_zero();
 
-    //TODO implement interval check
 }
 

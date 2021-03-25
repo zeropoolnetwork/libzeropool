@@ -4,7 +4,7 @@ use crate::fawkes_crypto::{
         num::CNum,
     },
     core::{
-        signal::Signal, sizedvec::SizedVec,
+        signal::Signal,
     },
     circuit::cs::RCS
 };
@@ -18,7 +18,7 @@ use crate::constants;
 #[Value = "Account<P>"]
 pub struct CAccount<P:PoolParams> {
     pub xsk: CNum<P::Fr>,
-    pub interval: SizedVec<CBoundedNum<P::Fr, constants::H>, constants::INTN>,
+    pub interval: CBoundedNum<P::Fr, constants::H>,
     pub v: CBoundedNum<P::Fr, constants::V>,
     pub st: CBoundedNum<P::Fr, constants::ST>,
 }

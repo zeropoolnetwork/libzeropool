@@ -19,7 +19,7 @@ use crate::{
 };
 
 
-use std::{collections::btree_set::Intersection, fmt::Debug};
+use std::fmt::Debug;
 
 
 
@@ -44,7 +44,7 @@ pub struct TransferPub<P: PoolParams> {
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct TransferSec<P: PoolParams> {
     pub tx: Tx<P>,
-    pub in_proof: SizedVec<MerkleProof<P::Fr, constants::H>, constants::INPROOF>,
+    pub in_proof: (MerkleProof<P::Fr, constants::H>, SizedVec<MerkleProof<P::Fr, constants::H>, constants::IN>),
     pub eddsa_s: Num<P::Fr>,
     pub eddsa_r: Num<P::Fr>,
     pub eddsa_a: Num<P::Fr>,
@@ -63,10 +63,7 @@ pub fn note_hash<P: PoolParams>(note: Note<P>, params: &P) -> Num<P::Fr> {
 }
 
 pub fn accout_hash<P: PoolParams>(ac: Account<P>, params: &P) -> Num<P::Fr> {
-    let mut inputs = vec![ac.xsk];
-    inputs.extend(ac.interval.iter().map(|n| n.to_num()));
-    inputs.extend(vec![ac.v.to_num(), ac.st.to_num()]);
-
+    let inputs = vec![ac.xsk, ac.interval.to_num(), ac.v.to_num(), ac.st.to_num()];
     poseidon(
         &inputs,
         params.note(),

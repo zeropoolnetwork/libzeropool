@@ -1,8 +1,8 @@
 use crate::{
     fawkes_crypto::{
-        ff_uint::{Num, PrimeField, PrimeFieldParams},
+        ff_uint::{Num, PrimeField},
         borsh::{BorshSerialize, BorshDeserialize},
-        native::ecc::{EdwardsPoint, JubJubParams}
+        native::ecc::{EdwardsPoint}
     },
     native::{
         account::Account,
@@ -14,9 +14,7 @@ use crate::{
 };
 
 use sha3::{Digest, Keccak256};
-use std::io::{self, Write};
 
-use super::account;
 
 fn xor_crypt<D: Digest + Clone>(prefix: &D, data: &[u8]) -> Vec<u8> {
     let mut mask = vec![];
@@ -47,7 +45,7 @@ fn checksum_filter(buf:&[u8]) -> Option<&[u8]> {
         None
     } else {
         let cs = checksum(&buf[0..l-CHECKSUM_SIZE]);
-        if cs.iter().zip(buf[CHECKSUM_SIZE..l].iter()).any(|(&a, &b)| a != b) {
+        if cs.iter().zip(buf[l-CHECKSUM_SIZE..l].iter()).any(|(&a, &b)| a != b) {
             None
         } else {
             Some(&buf[0..l-CHECKSUM_SIZE])
@@ -58,7 +56,6 @@ fn checksum_filter(buf:&[u8]) -> Option<&[u8]> {
 
 pub fn encrypt<P: PoolParams>(
     esk: Num<P::Fs>,
-    dk: Num<P::Fs>,
     sdk: Num<P::Fs>,
     adk: Num<P::Fs>,
     item: (Account<P>, Note<P>),
@@ -74,11 +71,10 @@ pub fn encrypt<P: PoolParams>(
     account_vec.extend(checksum(&account_vec));
     let account_vec_enc = xor_crypt(&dh_prefix(dh_account.x), &account_vec);
 
-    let note_vec = item.1.try_to_vec().unwrap();
+    let mut note_vec = item.1.try_to_vec().unwrap();
+    note_vec.extend(checksum(&note_vec));
     let note_vec_enc = xor_crypt(&dh_prefix(dh_note.x), &note_vec);
-    account_vec.extend(checksum(&note_vec));
-
-
+    
     let mut res = vec![];
     res.extend(receiver_epk.x.try_to_vec().unwrap());
     res.extend(sender_epk.x.try_to_vec().unwrap());
@@ -135,7 +131,7 @@ pub fn decrypt_out<P: PoolParams>(
         None
     } else {
         let sender_epk = Num::try_from_slice(&msg_data[NUM_SIZE..2*NUM_SIZE]).ok()?;
-        let decr_account = decrypt(adk, sender_epk, &msg_data[2*NUM_SIZE..2*NUM_SIZE+ACCOUNT_SIZE], params)?;
+        let decr_account = decrypt(adk, sender_epk, &msg_data[2*NUM_SIZE..2*NUM_SIZE+ACCOUNT_SIZE+CHECKSUM_SIZE], params)?;
         let decr_note = decrypt(sdk, sender_epk, &msg_data[COMMITMENT_TOTAL_SIZE - NOTE_SIZE - CHECKSUM_SIZE..], params)?;
         let account = Account::try_from_slice(&decr_account).ok()?;
         let note = Note::try_from_slice(&decr_note).ok()?;

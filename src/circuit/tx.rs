@@ -34,7 +34,7 @@ pub struct CTransferPub<P: PoolParams> {
     pub root: CNum<P::Fr>,
     pub nullifier: CNum<P::Fr>,
     pub out_commit: CNum<P::Fr>,
-    pub delta: CNum<P::Fr>,
+    pub delta: CNum<P::Fr>, // int64 token delta, int96 energy delta, uint32 blocknumber
     pub memo: CNum<P::Fr>,
 }
 
@@ -153,9 +153,17 @@ pub fn c_derive_key_pk_d<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
         .x
 }
 
-pub fn c_parse_delta<P:PoolParams>(delta: &CNum<P::Fr>) -> CNum<P::Fr> {
-    let delta_bits = c_into_bits_le(delta, 64);
-    delta - &delta_bits[63].to_num() * Num::from_uint(NumRepr::ONE << constants::V::U32).unwrap()
+pub fn c_parse_delta<P:PoolParams>(delta: &CNum<P::Fr>) -> (CNum<P::Fr>, CNum<P::Fr>, CNum<P::Fr>) {
+    let delta_bits = c_into_bits_le(delta, 64+96+32);
+    let cv = constants::V::USIZE;
+    let ce = constants::E::USIZE;
+    let ch = constants::H::USIZE;
+    
+    let v = c_from_bits_le(&delta_bits[0..cv]) - &delta_bits[cv-1].to_num() * Num::from_uint(NumRepr::ONE << cv as u32).unwrap();
+    let e = c_from_bits_le(&delta_bits[cv..cv+ce]) - &delta_bits[cv+ce-1].to_num() * Num::from_uint(NumRepr::ONE << ce as u32).unwrap();
+    let index = c_from_bits_le(&delta_bits[cv+ce..cv+ce+ch]);
+
+    (v, e, index)
 }
 
 pub fn c_transfer<P:PoolParams>(
@@ -163,6 +171,11 @@ pub fn c_transfer<P:PoolParams>(
     s: &CTransferSec<P>,
     params: &P,
 ) {
+    //parse delta
+    let (delta_value, delta_energy, index) = c_parse_delta::<P>(&p.delta);
+    let mut total_value = delta_value;
+    let mut total_enegry = delta_energy;
+
     //build input hashes
     let account_hash = c_accout_hash(&s.tx.input.0, params);
     let note_hash = s.tx.input.1.iter().map(|n| c_note_hash(n, params)).collect::<Vec<_>>();
@@ -202,6 +215,12 @@ pub fn c_transfer<P:PoolParams>(
 
         //input.interval <= output.interval
         c_comp(s.tx.input.0.interval.as_num(), s.tx.output.0.interval.as_num(), constants::H::USIZE).assert_const(&false);
+
+        //output_interval <= index
+        c_comp(s.tx.output.0.interval.as_num(), &index, constants::H::USIZE).assert_const(&false);
+
+        //compute enegry
+        total_enegry += s.tx.input.0.v.as_num() * (s.tx.output.0.interval.as_num() - s.tx.input.0.interval.as_num());
     }
 
     //let account_index = c_from_bits_le(s.in_proof.0.path.as_slice());
@@ -217,6 +236,9 @@ pub fn c_transfer<P:PoolParams>(
         ((c_comp(s.tx.input.0.interval.as_num(), note_index, constants::H::USIZE).as_num() + Num::ONE -
         c_comp(s.tx.output.0.interval.as_num(), note_index, constants::H::USIZE).as_num()) *
         (note_index+note_value)).assert_const(&Num::ZERO);
+
+        //compute enegry
+        total_enegry += note_value * (s.tx.output.0.interval.as_num() - note_index);
     }
 
     //bind msg_hash to the circuit
@@ -228,19 +250,17 @@ pub fn c_transfer<P:PoolParams>(
     //check signature
     c_tx_verify(&s.eddsa_s, &s.eddsa_r, &s.eddsa_a, &tx_hash, params).assert_const(&true);
 
-    //parse delta
-    let delta_amount = c_parse_delta::<P>(&p.delta);
-
     //check balances
-    let mut amount = delta_amount;
-
-    amount += s.tx.input.0.v.as_num();
+    total_value += s.tx.input.0.v.as_num() - s.tx.output.0.v.as_num() - s.tx.output.1.v.as_num();
 
     for note in s.tx.input.1.iter() {
-        amount += note.v.as_num();
+        total_value += note.v.as_num();
     }
-    amount -= s.tx.output.0.v.as_num() + s.tx.output.1.v.as_num();
-    amount.assert_zero();
+    total_value.assert_zero();
+
+    //final check energy
+    total_enegry += s.tx.input.0.e.as_num()-s.tx.output.0.e.as_num();
+    total_enegry.assert_zero();
 
 }
 

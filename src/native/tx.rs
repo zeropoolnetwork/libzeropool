@@ -136,16 +136,37 @@ pub fn derive_key_pk_d<P: PoolParams>(
     EdwardsPoint::from_scalar(d_hash, params.jubjub()).mul(dk, params.jubjub())
 }
 
-pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> Num<P::Fr> {
-    let delta_num = delta.to_uint();
-    let min_neg_amount = NumRepr::ONE << (constants::V::U32 * 8 - 1);
-    let limit_amount = NumRepr::ONE << (constants::V::U32 * 8);
-    assert!(delta_num < limit_amount);
+pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> (Num<P::Fr>, Num<P::Fr>, Num<P::Fr>) {
+    let mut delta_num = delta.to_uint();
 
-    if delta_num < min_neg_amount {
-        delta
+    let v_limit = NumRepr::ONE << constants::V::U32;
+    let v_num = delta_num & (v_limit - NumRepr::ONE);
+    let v = if v_num < v_limit >> 1 {
+        Num::from_uint(v_num).unwrap()
     } else {
-        delta - Num::from_uint(limit_amount).unwrap()
-    }
+        Num::from_uint(v_num).unwrap() - Num::from_uint(v_limit).unwrap()
+    };
+
+    delta_num >>= constants::V::U32;
+
+    let e_limit = NumRepr::ONE << constants::E::U32;
+    let e_num = delta_num & (e_limit - NumRepr::ONE);
+    let e = if e_num < e_limit >> 1 {
+        Num::from_uint(e_num).unwrap()
+    } else {
+        Num::from_uint(e_num).unwrap() - Num::from_uint(e_limit).unwrap()
+    };
+
+    delta_num >>= constants::E::U32;
+
+    let h_limit = NumRepr::ONE << constants::H::U32;
+
+    assert!(delta_num < h_limit, "wrong delta amount");
+
+    let index = Num::from_uint(delta_num).unwrap();
+
+    (v, e, index)
+
+
 }
 

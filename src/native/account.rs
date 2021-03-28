@@ -20,6 +20,7 @@ pub struct Account<P:PoolParams> {
     pub xsk: Num<P::Fr>,
     pub interval: BoundedNum<P::Fr, constants::H>,
     pub v: BoundedNum<P::Fr, constants::V>,
+    pub e: BoundedNum<P::Fr, constants::E>,
     pub st: BoundedNum<P::Fr, constants::ST>,
 }
 
@@ -32,6 +33,7 @@ impl<P:PoolParams> PartialEq for Account<P> {
         self.xsk.eq(&other.xsk) && 
         self.interval.eq(&other.interval) &&
         self.v.eq(&other.v) &&
+        self.e.eq(&other.e) &&
         self.st.eq(&other.st)
     }
 }
@@ -42,6 +44,7 @@ impl<P:PoolParams> BorshSerialize for Account<P> {
         self.xsk.serialize(writer)?;
         self.interval.serialize(writer)?;
         self.v.serialize(writer)?;
+        self.e.serialize(writer)?;
         self.st.serialize(writer)
     }
 }
@@ -52,6 +55,7 @@ impl<P:PoolParams> BorshDeserialize for Account<P> {
             xsk: BorshDeserialize::deserialize(buf)?,
             interval: BorshDeserialize::deserialize(buf)?,
             v: BorshDeserialize::deserialize(buf)?,
+            e: BorshDeserialize::deserialize(buf)?,
             st: BorshDeserialize::deserialize(buf)?
         })  
     }
@@ -68,6 +72,7 @@ impl<P:PoolParams> fawkes_crypto::rand::distributions::Distribution<Account<P>>
             xsk: rng.gen(),
             interval: rng.gen(),
             v: rng.gen(),
+            e: rng.gen(),
             st: rng.gen()
         }
     }

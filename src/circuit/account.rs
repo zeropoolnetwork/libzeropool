@@ -20,5 +20,6 @@ pub struct CAccount<P:PoolParams> {
     pub xsk: CNum<P::Fr>,
     pub interval: CBoundedNum<P::Fr, constants::H>,
     pub v: CBoundedNum<P::Fr, constants::V>,
+    pub e: CBoundedNum<P::Fr, constants::E>,
     pub st: CBoundedNum<P::Fr, constants::ST>,
 }

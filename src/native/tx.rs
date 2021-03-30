@@ -72,13 +72,13 @@ pub fn accout_hash<P: PoolParams>(ac: Account<P>, params: &P) -> Num<P::Fr> {
 
 
 pub fn tx_hash<P: PoolParams>(
-    in_note_hash: &[Num<P::Fr>],
-    out_note_hash: &[Num<P::Fr>],
+    in_hash: &[Num<P::Fr>],
+    out_hash: &[Num<P::Fr>],
     params: &P,
 ) -> Num<P::Fr> {
-    let notes = in_note_hash
+    let notes = in_hash
         .iter()
-        .chain(out_note_hash.iter())
+        .chain(out_hash.iter())
         .cloned()
         .collect::<Vec<_>>();
     poseidon(&notes, params.tx())
@@ -166,7 +166,36 @@ pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> (Num<P::Fr>, Num<P::Fr>, 
     let index = Num::from_uint(delta_num).unwrap();
 
     (v, e, index)
-
-
 }
 
+
+pub fn make_delta<P:PoolParams>(v:Num<P::Fr>, e:Num<P::Fr>, index:Num<P::Fr>) -> Num<P::Fr> {
+    let v_limit = NumRepr::ONE << constants::V::U32;
+    let e_limit = NumRepr::ONE << constants::E::U32;
+    
+    let v_num = v.to_uint();
+    let e_num = e.to_uint();
+
+    assert!(v_num < v_limit>>1 || Num::<P::Fr>::MODULUS - v_num <= v_limit>>1, "v out of range");
+    assert!(e_num < e_limit>>1 || Num::<P::Fr>::MODULUS - e_num <= e_limit>>1, "v out of range");
+
+    let mut res = index;
+
+    res*=Num::from_uint(e_limit).unwrap();
+
+    if e_num < e_limit >> 1 {
+        res+=e;
+    } else {
+        res+=Num::from_uint(e_limit).unwrap()+e;
+    }
+
+    res*=Num::from_uint(v_limit).unwrap();
+
+    if v_num < v_limit >> 1 {
+        res+=v;
+    } else {
+        res+=Num::from_uint(v_limit).unwrap()+v;
+    }
+
+    res
+}

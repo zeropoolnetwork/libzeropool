@@ -1,7 +1,11 @@
+use fawkes_crypto::ff_uint::{NumRepr, PrimeFieldParams, Uint};
+
 use crate::{
     fawkes_crypto::{
         ff_uint::Num,
         borsh::{BorshSerialize, BorshDeserialize},
+        typenum::Unsigned,
+        native::poseidon::poseidon
     },
     native::{
         boundednum::BoundedNum,
@@ -25,6 +29,13 @@ pub struct Note<P:PoolParams> {
     pub pk_d: Num<P::Fr>,
     pub v: BoundedNum<P::Fr, constants::V>,
     pub st: BoundedNum<P::Fr, constants::ST>,
+}
+
+impl<P:PoolParams> Note<P> {
+    pub fn hash(&self, params:&P) -> Num<P::Fr> {
+        let v = [self.d.to_num(), self.pk_d, self.v.to_num(), self.st.to_num()];
+        poseidon(v.as_ref(), params.note())
+    }
 }
 
 impl<P:PoolParams> Copy for Note<P> {}
@@ -68,10 +79,13 @@ impl<P:PoolParams> fawkes_crypto::rand::distributions::Distribution<Note<P>>
 {
     #[inline]
     fn sample<R: fawkes_crypto::rand::Rng + ?Sized>(&self, rng: &mut R) -> Note<P> {
+        let n_bits = (<P::Fr as PrimeFieldParams>::Inner::NUM_WORDS*<P::Fr as PrimeFieldParams>::Inner::WORD_BITS) as u32;
+        let v_num = rng.gen::<NumRepr<<P::Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::V::U32/2);
+        let v = BoundedNum::new(Num::from_uint(v_num).unwrap());
         Note {
             d: rng.gen(),
             pk_d: rng.gen(),
-            v: rng.gen(),
+            v,
             st: rng.gen()
         }
     }

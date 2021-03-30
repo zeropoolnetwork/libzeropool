@@ -23,7 +23,7 @@ lazy_static! {
         hash: PoseidonParams::<Fr>::new(2, 8, 53),
         compress: PoseidonParams::<Fr>::new(3, 8, 53),
         note: PoseidonParams::<Fr>::new(5, 8, 54),
-        account: PoseidonParams::<Fr>::new(5, 8, 54),
+        account: PoseidonParams::<Fr>::new(6, 8, 54),
         tx: PoseidonParams::<Fr>::new(12, 8, 54),
         eddsa: PoseidonParams::<Fr>::new(4, 8, 53),
     };

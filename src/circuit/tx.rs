@@ -86,7 +86,7 @@ pub fn c_note_hash<P: PoolParams>(
 }
 
 pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<P::Fr> {
-    let inputs = vec![ac.xsk.clone(), ac.interval.as_num().clone(), ac.v.as_num().clone(), ac.st.as_num().clone()];
+    let inputs = vec![ac.xsk.clone(), ac.interval.as_num().clone(), ac.v.as_num().clone(), ac.e.as_num().clone(), ac.st.as_num().clone()];
     c_poseidon(
         &inputs,
         params.account(),
@@ -176,6 +176,8 @@ pub fn c_transfer<P:PoolParams>(
     let mut total_value = delta_value;
     let mut total_enegry = delta_energy;
 
+    
+
     //build input hashes
     let account_hash = c_accout_hash(&s.tx.input.0, params);
     let note_hash = s.tx.input.1.iter().map(|n| c_note_hash(n, params)).collect::<Vec<_>>();
@@ -259,7 +261,8 @@ pub fn c_transfer<P:PoolParams>(
     total_value.assert_zero();
 
     //final check energy
-    total_enegry += s.tx.input.0.e.as_num()-s.tx.output.0.e.as_num();
+    total_enegry += s.tx.input.0.e.as_num();
+    total_enegry -= s.tx.output.0.e.as_num();
     total_enegry.assert_zero();
 
 }

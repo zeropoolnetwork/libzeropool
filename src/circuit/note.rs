@@ -22,8 +22,8 @@ use crate::constants;
 #[Field = "P::Fr"]
 #[Value = "Note<P>"]
 pub struct CNote<P:PoolParams> {
-    pub d: CBoundedNum<P::Fr, constants::D>,
+    pub d: CBoundedNum<P::Fr, { constants::D }>,
     pub pk_d: CNum<P::Fr>,
-    pub v: CBoundedNum<P::Fr, constants::V>,
-    pub st: CBoundedNum<P::Fr, constants::ST>,
+    pub v: CBoundedNum<P::Fr, { constants::V }>,
+    pub st: CBoundedNum<P::Fr, { constants::ST }>,
 }

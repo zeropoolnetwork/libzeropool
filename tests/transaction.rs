@@ -8,7 +8,6 @@ use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_trans
         ff_uint::Num,
         native::poseidon::poseidon, 
         rand::{self, thread_rng, Rng},
-        typenum::Unsigned,
         backend::bellman_groth16::{
             engines::Bn256,
             setup::setup,
@@ -48,7 +47,7 @@ impl<P:PoolParams> State<P> {
 
 
         let account_id = rng.gen_range(0, N_ITEMS);
-        let note_id = rand::seq::index::sample(rng, N_ITEMS, constants::IN::USIZE).into_vec();
+        let note_id = rand::seq::index::sample(rng, N_ITEMS, constants::IN).into_vec();
 
 
         let mut items:Vec<(Account<_>, Note<_>)> = (0..N_ITEMS).map(|_| (rng.gen(), rng.gen())).collect();
@@ -60,10 +59,10 @@ impl<P:PoolParams> State<P> {
         items[account_id].0.xsk = xsk;
         items[account_id].0.interval = BoundedNum::new(Num::ZERO);
 
-        let mut default_hashes = vec![Num::ZERO;constants::H::USIZE+1];
+        let mut default_hashes = vec![Num::ZERO;constants::H+1];
         let mut hashes = vec![];
 
-        for i in 0..constants::H::USIZE {
+        for i in 0..constants::H {
             let t = default_hashes[i];
             default_hashes[i+1] = poseidon([t,t].as_ref(), params.compress());
         }
@@ -81,7 +80,7 @@ impl<P:PoolParams> State<P> {
             hashes.push(t);
         }
 
-        for i in 0..constants::H::USIZE {
+        for i in 0..constants::H {
             let mut t = vec![];
             for j in 0..hashes[i].len()>>1 {
                 t.push(poseidon([hashes[i][2*j],hashes[i][2*j+1]].as_ref(), params.compress()));
@@ -184,14 +183,14 @@ impl<P:PoolParams> State<P> {
         }
     }
 
-    fn merkle_proof(&self, id:usize) -> MerkleProof<P::Fr, constants::H> {
-        let sibling = (0..constants::H::USIZE).map(|i| self.cell(i, (id>>i)^1)).collect();
-        let path =  (0..constants::H::USIZE).map(|i| (id>>i)&1==1).collect();
+    fn merkle_proof(&self, id:usize) -> MerkleProof<P::Fr, { constants::H }> {
+        let sibling = (0..constants::H).map(|i| self.cell(i, (id>>i)^1)).collect();
+        let path =  (0..constants::H).map(|i| (id>>i)&1==1).collect();
         MerkleProof {sibling, path}
     }
 
     fn root(&self) -> Num<P::Fr> {
-        return self.hashes[constants::H::USIZE][0]
+        return self.hashes[constants::H][0]
     }
 
 }

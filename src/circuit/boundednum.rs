@@ -1,5 +1,3 @@
-use crate::fawkes_crypto::typenum::Unsigned;
-
 use crate::fawkes_crypto::circuit::{
     bitify::{c_into_bits_le, c_into_bits_le_strict, c_from_bits_le},
     bool::CBool,
@@ -13,14 +11,12 @@ use crate::fawkes_crypto::ff_uint::{NumRepr, PrimeField};
 use crate::fawkes_crypto::circuit::cs::RCS;
 use crate::native::boundednum::BoundedNum;
 
-use std::marker::PhantomData;
-
 #[derive(Clone)]
-pub struct CBoundedNum<Fr:PrimeField, L:Unsigned>(CNum<Fr>, PhantomData<L>);
+pub struct CBoundedNum<Fr:PrimeField, const L: usize>(CNum<Fr>);
 
-impl<Fr:PrimeField, L:Unsigned> CBoundedNum<Fr, L> {
+impl<Fr:PrimeField, const L: usize> CBoundedNum<Fr, L> {
     pub fn new_unchecked(n:&CNum<Fr>) -> Self {
-        Self(n.clone(), PhantomData)
+        Self(n.clone())
     }
 
     pub fn new_trimmed(n:CNum<Fr>) -> Self {
@@ -36,14 +32,14 @@ impl<Fr:PrimeField, L:Unsigned> CBoundedNum<Fr, L> {
     }
 
     pub fn new(n:&CNum<Fr>) -> Self {
-        assert!(L::U32 < Fr::MODULUS_BITS);
+        assert!(L < Fr::MODULUS_BITS as usize);
         match n.as_const() {
             Some(cn) => {
-                assert!(cn.to_uint() < (NumRepr::<Fr::Inner>::ONE << L::U32));
+                assert!(cn.to_uint() < (NumRepr::<Fr::Inner>::ONE << L as u32));
                 Self::new_unchecked(n)
             },
             _ => {
-                c_into_bits_le(n, L::USIZE);
+                c_into_bits_le(n, L);
                 Self::new_unchecked(n)
             }
         }
@@ -53,7 +49,7 @@ impl<Fr:PrimeField, L:Unsigned> CBoundedNum<Fr, L> {
     }
 }
 
-impl<Fr:PrimeField, L:Unsigned> Signal<Fr> for CBoundedNum<Fr, L> {
+impl<Fr:PrimeField, const L: usize> Signal<Fr> for CBoundedNum<Fr, L> {
     type Value = BoundedNum<Fr,L>;
 
     fn as_const(&self) -> Option<Self::Value> {

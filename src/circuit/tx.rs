@@ -1,4 +1,3 @@
-use crate::fawkes_crypto::typenum::{Unsigned};
 use crate::fawkes_crypto::circuit::{
     bitify::{c_comp_constant, c_into_bits_le, c_into_bits_le_strict, c_comp, c_from_bits_le},
     bool::CBool,
@@ -42,7 +41,7 @@ pub struct CTransferPub<P: PoolParams> {
 #[Value = "Tx<P>"]
 #[Field = "P::Fr"]
 pub struct CTx<P: PoolParams> {
-    pub input: (CAccount<P>, SizedVec<CNote<P>, constants::IN>),
+    pub input: (CAccount<P>, SizedVec<CNote<P>, { constants::IN }>),
     pub output: (CAccount<P>, CNote<P>)
 }
 
@@ -51,7 +50,7 @@ pub struct CTx<P: PoolParams> {
 #[Field = "P::Fr"]
 pub struct CTransferSec<P:PoolParams> {
     pub tx: CTx<P>,
-    pub in_proof: (CMerkleProof<P::Fr, constants::H>, SizedVec<CMerkleProof<P::Fr, constants::H>, constants::IN>),
+    pub in_proof: (CMerkleProof<P::Fr, { constants::H }>, SizedVec<CMerkleProof<P::Fr, { constants::H }>, { constants::IN }>),
     pub eddsa_s: CNum<P::Fr>,
     pub eddsa_r: CNum<P::Fr>,
     pub eddsa_a: CNum<P::Fr>,
@@ -154,11 +153,11 @@ pub fn c_derive_key_pk_d<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
 }
 
 pub fn c_parse_delta<P:PoolParams>(delta: &CNum<P::Fr>) -> (CNum<P::Fr>, CNum<P::Fr>, CNum<P::Fr>) {
-    let cv = constants::V::USIZE;
-    let ce = constants::E::USIZE;
-    let ch = constants::H::USIZE;
+    let cv = constants::V;
+    let ce = constants::E;
+    let ch = constants::H;
     let delta_bits = c_into_bits_le(delta, cv+ce+ch);
-    
+
     let v = c_from_bits_le(&delta_bits[0..cv]) - &delta_bits[cv-1].to_num() * Num::from_uint(NumRepr::ONE << cv as u32).unwrap();
     let e = c_from_bits_le(&delta_bits[cv..cv+ce]) - &delta_bits[cv+ce-1].to_num() * Num::from_uint(NumRepr::ONE << ce as u32).unwrap();
     let index = c_from_bits_le(&delta_bits[cv+ce..cv+ce+ch]);
@@ -193,7 +192,7 @@ pub fn c_transfer<P:PoolParams>(
     (&s.tx.input.0.xsk - &s.eddsa_a).assert_zero();
     (&s.tx.output.0.xsk - &s.eddsa_a).assert_zero();
 
-    for i in 0..constants::IN::USIZE {
+    for i in 0..constants::IN {
         (&s.tx.input.1[i].pk_d - c_derive_key_pk_d(&s.tx.input.1[i].d.as_num(), &dk_bits, params)).assert_zero();
     }
 
@@ -216,10 +215,10 @@ pub fn c_transfer<P:PoolParams>(
         ((cur_root - &p.root) * (s.tx.input.0.v.as_num()+s.tx.input.0.st.as_num()+s.tx.input.0.interval.as_num())).assert_zero();
 
         //input.interval <= output.interval
-        c_comp(s.tx.input.0.interval.as_num(), s.tx.output.0.interval.as_num(), constants::H::USIZE).assert_const(&false);
+        c_comp(s.tx.input.0.interval.as_num(), s.tx.output.0.interval.as_num(), constants::H).assert_const(&false);
 
         //output_interval <= index
-        c_comp(s.tx.output.0.interval.as_num(), &index, constants::H::USIZE).assert_const(&false);
+        c_comp(s.tx.output.0.interval.as_num(), &index, constants::H).assert_const(&false);
 
         //compute enegry
         total_enegry += s.tx.input.0.v.as_num() * (s.tx.output.0.interval.as_num() - s.tx.input.0.interval.as_num());
@@ -227,7 +226,7 @@ pub fn c_transfer<P:PoolParams>(
 
     //let account_index = c_from_bits_le(s.in_proof.0.path.as_slice());
 
-    for i in 0..constants::IN::USIZE {
+    for i in 0..constants::IN {
         let note_value = s.tx.input.1[i].v.as_num();
         let ref note_index = c_from_bits_le(s.in_proof.1[i].path.as_slice());
 
@@ -235,8 +234,8 @@ pub fn c_transfer<P:PoolParams>(
         ((cur_root - &p.root) * note_value).assert_zero();
 
         //note_index >= account_in.interval && note_index < account_out.interval || note_index == 0 && value == 0
-        ((c_comp(s.tx.input.0.interval.as_num(), note_index, constants::H::USIZE).as_num() + Num::ONE -
-        c_comp(s.tx.output.0.interval.as_num(), note_index, constants::H::USIZE).as_num()) *
+        ((c_comp(s.tx.input.0.interval.as_num(), note_index, constants::H).as_num() + Num::ONE -
+        c_comp(s.tx.output.0.interval.as_num(), note_index, constants::H).as_num()) *
         (note_index+note_value)).assert_const(&Num::ZERO);
 
         //compute enegry

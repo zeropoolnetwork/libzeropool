@@ -4,7 +4,6 @@ use crate::{
     fawkes_crypto::{
         ff_uint::Num,
         borsh::{BorshSerialize, BorshDeserialize},
-        typenum::Unsigned,
         native::poseidon::poseidon
     },
     native::{
@@ -25,10 +24,10 @@ use std::io::{self, Write};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct Note<P:PoolParams> {
-    pub d: BoundedNum<P::Fr, constants::D>,
+    pub d: BoundedNum<P::Fr, { constants::D }>,
     pub pk_d: Num<P::Fr>,
-    pub v: BoundedNum<P::Fr, constants::V>,
-    pub st: BoundedNum<P::Fr, constants::ST>,
+    pub v: BoundedNum<P::Fr, { constants::V }>,
+    pub st: BoundedNum<P::Fr, { constants::ST }>,
 }
 
 impl<P:PoolParams> Note<P> {
@@ -80,7 +79,7 @@ impl<P:PoolParams> fawkes_crypto::rand::distributions::Distribution<Note<P>>
     #[inline]
     fn sample<R: fawkes_crypto::rand::Rng + ?Sized>(&self, rng: &mut R) -> Note<P> {
         let n_bits = (<P::Fr as PrimeFieldParams>::Inner::NUM_WORDS*<P::Fr as PrimeFieldParams>::Inner::WORD_BITS) as u32;
-        let v_num = rng.gen::<NumRepr<<P::Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::V::U32/2);
+        let v_num = rng.gen::<NumRepr<<P::Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::V as u32/2);
         let v = BoundedNum::new(Num::from_uint(v_num).unwrap());
         Note {
             d: rng.gen(),

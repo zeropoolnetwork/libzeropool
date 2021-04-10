@@ -8,7 +8,6 @@ use crate::{
         core::sizedvec::SizedVec,
         ff_uint::{Num, NumRepr},
         borsh::{self, BorshSerialize, BorshDeserialize},
-        typenum::Unsigned
     },
     native::{
         params::PoolParams,
@@ -26,7 +25,7 @@ use std::fmt::Debug;
 #[derive(Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct Tx<P: PoolParams> {
-    pub input: (Account<P>, SizedVec<Note<P>, constants::IN>),
+    pub input: (Account<P>, SizedVec<Note<P>, { constants::IN }>),
     pub output: (Account<P>, Note<P>)
 }
 
@@ -44,7 +43,7 @@ pub struct TransferPub<P: PoolParams> {
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct TransferSec<P: PoolParams> {
     pub tx: Tx<P>,
-    pub in_proof: (MerkleProof<P::Fr, constants::H>, SizedVec<MerkleProof<P::Fr, constants::H>, constants::IN>),
+    pub in_proof: (MerkleProof<P::Fr, { constants::H }>, SizedVec<MerkleProof<P::Fr, { constants::H }>, { constants::IN }>),
     pub eddsa_s: Num<P::Fr>,
     pub eddsa_r: Num<P::Fr>,
     pub eddsa_a: Num<P::Fr>,
@@ -139,7 +138,7 @@ pub fn derive_key_pk_d<P: PoolParams>(
 pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> (Num<P::Fr>, Num<P::Fr>, Num<P::Fr>) {
     let mut delta_num = delta.to_uint();
 
-    let v_limit = NumRepr::ONE << constants::V::U32;
+    let v_limit = NumRepr::ONE << constants::V as u32;
     let v_num = delta_num & (v_limit - NumRepr::ONE);
     let v = if v_num < v_limit >> 1 {
         Num::from_uint(v_num).unwrap()
@@ -147,9 +146,9 @@ pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> (Num<P::Fr>, Num<P::Fr>, 
         Num::from_uint(v_num).unwrap() - Num::from_uint(v_limit).unwrap()
     };
 
-    delta_num >>= constants::V::U32;
+    delta_num >>= constants::V as u32;
 
-    let e_limit = NumRepr::ONE << constants::E::U32;
+    let e_limit = NumRepr::ONE << constants::E as u32;
     let e_num = delta_num & (e_limit - NumRepr::ONE);
     let e = if e_num < e_limit >> 1 {
         Num::from_uint(e_num).unwrap()
@@ -157,9 +156,9 @@ pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> (Num<P::Fr>, Num<P::Fr>, 
         Num::from_uint(e_num).unwrap() - Num::from_uint(e_limit).unwrap()
     };
 
-    delta_num >>= constants::E::U32;
+    delta_num >>= constants::E as u32;
 
-    let h_limit = NumRepr::ONE << constants::H::U32;
+    let h_limit = NumRepr::ONE << constants::H as u32;
 
     assert!(delta_num < h_limit, "wrong delta amount");
 
@@ -170,8 +169,8 @@ pub fn parse_delta<P:PoolParams>(delta: Num<P::Fr>) -> (Num<P::Fr>, Num<P::Fr>, 
 
 
 pub fn make_delta<P:PoolParams>(v:Num<P::Fr>, e:Num<P::Fr>, index:Num<P::Fr>) -> Num<P::Fr> {
-    let v_limit = NumRepr::ONE << constants::V::U32;
-    let e_limit = NumRepr::ONE << constants::E::U32;
+    let v_limit = NumRepr::ONE << constants::V as u32;
+    let e_limit = NumRepr::ONE << constants::E as u32;
     
     let v_num = v.to_uint();
     let e_num = e.to_uint();

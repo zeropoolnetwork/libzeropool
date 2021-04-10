@@ -29,8 +29,8 @@ impl<Fr:PrimeField, const L: usize> BoundedNum<Fr, L> {
     }
 
     pub fn new_trimmed(n:Num<Fr>) -> Self {
-        assert!(L::U32 < Fr::MODULUS_BITS);
-        let t = Num::from_uint_unchecked(n.to_uint() & ((NumRepr::<Fr::Inner>::ONE << L::U32) - NumRepr::<Fr::Inner>::ONE));
+        assert!((L as u32) < Fr::MODULUS_BITS);
+        let t = Num::from_uint_unchecked(n.to_uint() & ((NumRepr::<Fr::Inner>::ONE << L as u32) - NumRepr::<Fr::Inner>::ONE));
         Self::new_unchecked(t)
     }
 

@@ -23,9 +23,9 @@ impl<Fr:PrimeField, const L: usize> CBoundedNum<Fr, L> {
         match n.as_const() {
             Some(cn) => n.derive_const(&BoundedNum::new_trimmed(cn)),
             _ => {
-                assert!(L::U32 < Fr::MODULUS_BITS);
+                assert!((L as u32) < Fr::MODULUS_BITS);
                 let bits = c_into_bits_le_strict(&n);
-                let new_n = c_from_bits_le(&bits[0..L::USIZE]);
+                let new_n = c_from_bits_le(&bits[0..L]);
                 Self::new_unchecked(&new_n)
             }
         }

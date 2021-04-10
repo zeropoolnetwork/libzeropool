@@ -1,7 +1,7 @@
 use crate::fawkes_crypto::typenum::Unsigned;
 
 use crate::fawkes_crypto::circuit::{
-    bitify::{c_into_bits_le},
+    bitify::{c_into_bits_le, c_into_bits_le_strict, c_from_bits_le},
     bool::CBool,
     num::CNum,
 };
@@ -21,6 +21,18 @@ pub struct CBoundedNum<Fr:PrimeField, L:Unsigned>(CNum<Fr>, PhantomData<L>);
 impl<Fr:PrimeField, L:Unsigned> CBoundedNum<Fr, L> {
     pub fn new_unchecked(n:&CNum<Fr>) -> Self {
         Self(n.clone(), PhantomData)
+    }
+
+    pub fn new_trimmed(n:CNum<Fr>) -> Self {
+        match n.as_const() {
+            Some(cn) => n.derive_const(&BoundedNum::new_trimmed(cn)),
+            _ => {
+                assert!(L::U32 < Fr::MODULUS_BITS);
+                let bits = c_into_bits_le_strict(&n);
+                let new_n = c_from_bits_le(&bits[0..L::USIZE]);
+                Self::new_unchecked(&new_n)
+            }
+        }
     }
 
     pub fn new(n:&CNum<Fr>) -> Self {

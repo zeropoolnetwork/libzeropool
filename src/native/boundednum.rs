@@ -30,6 +30,12 @@ impl<Fr:PrimeField, L:Unsigned> BoundedNum<Fr, L> {
         Self::new_unchecked(n)
     }
 
+    pub fn new_trimmed(n:Num<Fr>) -> Self {
+        assert!(L::U32 < Fr::MODULUS_BITS);
+        let t = Num::from_uint_unchecked(n.to_uint() & ((NumRepr::<Fr::Inner>::ONE << L::U32) - NumRepr::<Fr::Inner>::ONE));
+        Self::new_unchecked(t)
+    }
+
     pub fn new_unchecked(n:Num<Fr>) -> Self {
         Self(n, PhantomData)
     }

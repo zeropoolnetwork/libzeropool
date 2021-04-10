@@ -154,10 +154,10 @@ pub fn c_derive_key_pk_d<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
 }
 
 pub fn c_parse_delta<P:PoolParams>(delta: &CNum<P::Fr>) -> (CNum<P::Fr>, CNum<P::Fr>, CNum<P::Fr>) {
-    let delta_bits = c_into_bits_le(delta, 64+96+32);
     let cv = constants::V::USIZE;
     let ce = constants::E::USIZE;
     let ch = constants::H::USIZE;
+    let delta_bits = c_into_bits_le(delta, cv+ce+ch);
     
     let v = c_from_bits_le(&delta_bits[0..cv]) - &delta_bits[cv-1].to_num() * Num::from_uint(NumRepr::ONE << cv as u32).unwrap();
     let e = c_from_bits_le(&delta_bits[cv..cv+ce]) - &delta_bits[cv+ce-1].to_num() * Num::from_uint(NumRepr::ONE << ce as u32).unwrap();

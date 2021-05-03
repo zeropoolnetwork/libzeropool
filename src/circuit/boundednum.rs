@@ -8,18 +8,18 @@ use crate::fawkes_crypto::core::{
 };
 
 use crate::fawkes_crypto::ff_uint::{NumRepr, PrimeField};
-use crate::fawkes_crypto::circuit::cs::RCS;
+use crate::fawkes_crypto::circuit::cs::{RCS, SetupCS};
 use crate::native::boundednum::BoundedNum;
 
 #[derive(Clone)]
-pub struct CBoundedNum<Fr:PrimeField, const L: usize>(CNum<Fr>);
+pub struct CBoundedNum<Fr:PrimeField, const L: usize>(CNum<SetupCS<Fr>>);
 
 impl<Fr:PrimeField, const L: usize> CBoundedNum<Fr, L> {
-    pub fn new_unchecked(n:&CNum<Fr>) -> Self {
+    pub fn new_unchecked(n:&CNum<SetupCS<Fr>>) -> Self {
         Self(n.clone())
     }
 
-    pub fn new_trimmed(n:CNum<Fr>) -> Self {
+    pub fn new_trimmed(n:CNum<SetupCS<Fr>>) -> Self {
         match n.as_const() {
             Some(cn) => n.derive_const(&BoundedNum::new_trimmed(cn)),
             _ => {
@@ -31,7 +31,7 @@ impl<Fr:PrimeField, const L: usize> CBoundedNum<Fr, L> {
         }
     }
 
-    pub fn new(n:&CNum<Fr>) -> Self {
+    pub fn new(n:&CNum<SetupCS<Fr>>) -> Self {
         assert!(L < Fr::MODULUS_BITS as usize);
         match n.as_const() {
             Some(cn) => {
@@ -44,12 +44,12 @@ impl<Fr:PrimeField, const L: usize> CBoundedNum<Fr, L> {
             }
         }
     }
-    pub fn as_num(&self) -> &CNum<Fr> {
+    pub fn as_num(&self) -> &CNum<SetupCS<Fr>> {
         &self.0
     }
 }
 
-impl<Fr:PrimeField, const L: usize> Signal<Fr> for CBoundedNum<Fr, L> {
+impl<Fr:PrimeField, const L: usize> Signal<SetupCS<Fr>> for CBoundedNum<Fr, L> {
     type Value = BoundedNum<Fr,L>;
 
     fn as_const(&self) -> Option<Self::Value> {
@@ -63,22 +63,22 @@ impl<Fr:PrimeField, const L: usize> Signal<Fr> for CBoundedNum<Fr, L> {
     }
 
 
-    fn from_const(cs: &RCS<Fr>, value: &Self::Value) -> Self {
+    fn from_const(cs: &RCS<SetupCS<Fr>>, value: &Self::Value) -> Self {
         let n = Signal::from_const(cs, value.as_num());
         Self::new(&n)
     }
 
-    fn get_cs(&self) -> &RCS<Fr> {
+    fn get_cs(&self) -> &RCS<SetupCS<Fr>> {
         self.0.get_cs()
     }
 
-    fn alloc(cs: &RCS<Fr>, value: Option<&Self::Value>) -> Self {
+    fn alloc(cs: &RCS<SetupCS<Fr>>, value: Option<&Self::Value>) -> Self {
         let n = Signal::alloc(cs, value.map(|v| v.as_num()));
         Self::new(&n)
         
     }
 
-    fn switch(&self, bit: &CBool<Fr>, if_else: &Self) -> Self {
+    fn switch(&self, bit: &CBool<SetupCS<Fr>>, if_else: &Self) -> Self {
         let n = self.0.switch(bit, &if_else.0);
         Self::new_unchecked(&n)
     }
@@ -91,7 +91,7 @@ impl<Fr:PrimeField, const L: usize> Signal<Fr> for CBoundedNum<Fr, L> {
         self.0.assert_eq(&other.0);
     }
 
-    fn is_eq(&self, other: &Self) -> CBool<Fr> {
+    fn is_eq(&self, other: &Self) -> CBool<SetupCS<Fr>> {
         self.0.is_eq(&other.0)
     }
 

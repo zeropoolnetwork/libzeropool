@@ -11,7 +11,7 @@ use crate::fawkes_crypto::core::{
 };
 use crate::fawkes_crypto::native::{ecc::JubJubParams};
 use crate::fawkes_crypto::ff_uint::{Num, NumRepr, PrimeField, PrimeFieldParams};
-use crate::fawkes_crypto::circuit::cs::RCS;
+use crate::fawkes_crypto::circuit::cs::{RCS, SetupCS};
 use crate::circuit::{
     account::CAccount,
     note::CNote
@@ -28,18 +28,18 @@ use crate::constants;
 
 #[derive(Clone, Signal)]
 #[Value = "TransferPub<P>"]
-#[Field = "P::Fr"]
+#[Field = "SetupCS<P::Fr>"]
 pub struct CTransferPub<P: PoolParams> {
-    pub root: CNum<P::Fr>,
-    pub nullifier: CNum<P::Fr>,
-    pub out_commit: CNum<P::Fr>,
-    pub delta: CNum<P::Fr>, // int64 token delta, int96 energy delta, uint32 blocknumber
-    pub memo: CNum<P::Fr>,
+    pub root: CNum<SetupCS<P::Fr>>,
+    pub nullifier: CNum<SetupCS<P::Fr>>,
+    pub out_commit: CNum<SetupCS<P::Fr>>,
+    pub delta: CNum<SetupCS<P::Fr>>, // int64 token delta, int96 energy delta, uint32 blocknumber
+    pub memo: CNum<SetupCS<P::Fr>>,
 }
 
 #[derive(Clone, Signal)]
 #[Value = "Tx<P>"]
-#[Field = "P::Fr"]
+#[Field = "SetupCS<P::Fr>"]
 pub struct CTx<P: PoolParams> {
     pub input: (CAccount<P>, SizedVec<CNote<P>, { constants::IN }>),
     pub output: (CAccount<P>, CNote<P>)
@@ -47,20 +47,20 @@ pub struct CTx<P: PoolParams> {
 
 #[derive(Clone, Signal)]
 #[Value = "TransferSec<P>"]
-#[Field = "P::Fr"]
+#[Field = "SetupCS<P::Fr>"]
 pub struct CTransferSec<P:PoolParams> {
     pub tx: CTx<P>,
-    pub in_proof: (CMerkleProof<P::Fr, { constants::H }>, SizedVec<CMerkleProof<P::Fr, { constants::H }>, { constants::IN }>),
-    pub eddsa_s: CNum<P::Fr>,
-    pub eddsa_r: CNum<P::Fr>,
-    pub eddsa_a: CNum<P::Fr>,
+    pub in_proof: (CMerkleProof<SetupCS<P::Fr>, { constants::H }>, SizedVec<CMerkleProof<SetupCS<P::Fr>, { constants::H }>, { constants::IN }>),
+    pub eddsa_s: CNum<SetupCS<P::Fr>>,
+    pub eddsa_r: CNum<SetupCS<P::Fr>>,
+    pub eddsa_a: CNum<SetupCS<P::Fr>>,
 }
 
 pub fn c_nullfifier<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    account_hash: &CNum<Fr>,
-    xsk: &CNum<Fr>,
+    account_hash: &CNum<SetupCS<Fr>>,
+    xsk: &CNum<SetupCS<Fr>>,
     params: &P,
-) -> CNum<Fr> {
+) -> CNum<SetupCS<Fr>> {
     c_poseidon(
         [account_hash.clone(), xsk.clone()].as_ref(),
         params.compress(),
@@ -71,7 +71,7 @@ pub fn c_nullfifier<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
 pub fn c_note_hash<P: PoolParams>(
     note: &CNote<P>,
     params: &P,
-) -> CNum<P::Fr> {
+) -> CNum<SetupCS<P::Fr>> {
     c_poseidon(
         [
             note.d.as_num().clone(),
@@ -84,7 +84,7 @@ pub fn c_note_hash<P: PoolParams>(
     )
 }
 
-pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<P::Fr> {
+pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<SetupCS<P::Fr>> {
     let inputs = vec![ac.xsk.clone(), ac.interval.as_num().clone(), ac.v.as_num().clone(), ac.e.as_num().clone(), ac.st.as_num().clone()];
     c_poseidon(
         &inputs,
@@ -94,10 +94,10 @@ pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<P::Fr>
 
 
 pub fn c_tx_hash<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    in_hash: &[CNum<Fr>],
-    out_hash: &[CNum<Fr>],
+    in_hash: &[CNum<SetupCS<Fr>>],
+    out_hash: &[CNum<SetupCS<Fr>>],
     params: &P,
-) -> CNum<Fr> {
+) -> CNum<SetupCS<Fr>> {
     let notes = in_hash
         .iter()
         .chain(out_hash.iter())
@@ -107,19 +107,19 @@ pub fn c_tx_hash<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
 }
 
 pub fn c_tx_verify<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    s: &CNum<Fr>,
-    r: &CNum<Fr>,
-    xsk: &CNum<Fr>,
-    tx_hash: &CNum<Fr>,
+    s: &CNum<SetupCS<Fr>>,
+    r: &CNum<SetupCS<Fr>>,
+    xsk: &CNum<SetupCS<Fr>>,
+    tx_hash: &CNum<SetupCS<Fr>>,
     params: &P,
-) -> CBool<Fr> {
+) -> CBool<SetupCS<Fr>> {
     c_eddsaposeidon_verify(s, r, xsk, tx_hash, params.eddsa(), params.jubjub())
 }
 
 pub fn c_derive_key_dk<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    xsk: &CNum<Fr>,
+    xsk: &CNum<SetupCS<Fr>>,
     params: &P,
-) -> Vec<CBool<Fr>> {
+) -> Vec<CBool<SetupCS<Fr>>> {
     let cs = xsk.get_cs();
     let t_dk = c_poseidon(&[xsk.clone()], params.hash());
     let dk_value = t_dk
@@ -142,17 +142,17 @@ pub fn c_derive_key_dk<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
 }
 
 pub fn c_derive_key_pk_d<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    d: &CNum<Fr>,
-    dk: &[CBool<Fr>],
+    d: &CNum<SetupCS<Fr>>,
+    dk: &[CBool<SetupCS<Fr>>],
     params: &P,
-) -> CNum<Fr> {
+) -> CNum<SetupCS<Fr>> {
     let d_hash = c_poseidon(&[d.clone()], params.hash());
     CEdwardsPoint::from_scalar(&d_hash, params.jubjub())
         .mul(dk, params.jubjub())
         .x
 }
 
-pub fn c_parse_delta<P:PoolParams>(delta: &CNum<P::Fr>) -> (CNum<P::Fr>, CNum<P::Fr>, CNum<P::Fr>) {
+pub fn c_parse_delta<P:PoolParams>(delta: &CNum<SetupCS<P::Fr>>) -> (CNum<SetupCS<P::Fr>>, CNum<SetupCS<P::Fr>>, CNum<SetupCS<P::Fr>>) {
     let cv = constants::V;
     let ce = constants::E;
     let ch = constants::H;

@@ -1,4 +1,4 @@
-use fawkes_crypto::ff_uint::{NumRepr, PrimeFieldParams, Uint};
+use fawkes_crypto::ff_uint::{NumRepr, PrimeField, PrimeFieldParams, Uint};
 
 use crate::{
     fawkes_crypto::{
@@ -23,25 +23,25 @@ use std::io::{self, Write};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
-pub struct Note<P:PoolParams> {
-    pub d: BoundedNum<P::Fr, { constants::D }>,
-    pub pk_d: Num<P::Fr>,
-    pub v: BoundedNum<P::Fr, { constants::V }>,
-    pub st: BoundedNum<P::Fr, { constants::ST }>,
+pub struct Note<Fr:PrimeField> {
+    pub d: BoundedNum<Fr, { constants::D }>,
+    pub pk_d: Num<Fr>,
+    pub v: BoundedNum<Fr, { constants::V }>,
+    pub st: BoundedNum<Fr, { constants::ST }>,
 }
 
-impl<P:PoolParams> Note<P> {
-    pub fn hash(&self, params:&P) -> Num<P::Fr> {
+impl<Fr:PrimeField> Note<Fr> {
+    pub fn hash<P:PoolParams<Fr=Fr>>(&self, params:&P) -> Num<Fr> {
         let v = [self.d.to_num(), self.pk_d, self.v.to_num(), self.st.to_num()];
         poseidon(v.as_ref(), params.note())
     }
 }
 
-impl<P:PoolParams> Copy for Note<P> {}
+impl<Fr:PrimeField> Copy for Note<Fr> {}
 
-impl<P:PoolParams> Eq for Note<P> {}
+impl<Fr:PrimeField> Eq for Note<Fr> {}
 
-impl<P:PoolParams> PartialEq for Note<P> {
+impl<Fr:PrimeField> PartialEq for Note<Fr> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.d.eq(&other.d) && 
@@ -52,7 +52,7 @@ impl<P:PoolParams> PartialEq for Note<P> {
 }
 
 
-impl<P:PoolParams> BorshSerialize for Note<P> {
+impl<Fr:PrimeField> BorshSerialize for Note<Fr> {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.d.serialize(writer)?;
         self.pk_d.serialize(writer)?;
@@ -61,7 +61,7 @@ impl<P:PoolParams> BorshSerialize for Note<P> {
     }
 }
 
-impl<P:PoolParams> BorshDeserialize for Note<P> {
+impl<Fr:PrimeField> BorshDeserialize for Note<Fr> {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
         Ok(Self{
             d: BorshDeserialize::deserialize(buf)?,
@@ -73,13 +73,13 @@ impl<P:PoolParams> BorshDeserialize for Note<P> {
 }
 
 
-impl<P:PoolParams> fawkes_crypto::rand::distributions::Distribution<Note<P>>
+impl<Fr:PrimeField> fawkes_crypto::rand::distributions::Distribution<Note<Fr>>
     for fawkes_crypto::rand::distributions::Standard
 {
     #[inline]
-    fn sample<R: fawkes_crypto::rand::Rng + ?Sized>(&self, rng: &mut R) -> Note<P> {
-        let n_bits = (<P::Fr as PrimeFieldParams>::Inner::NUM_WORDS*<P::Fr as PrimeFieldParams>::Inner::WORD_BITS) as u32;
-        let v_num = rng.gen::<NumRepr<<P::Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::V as u32/2);
+    fn sample<R: fawkes_crypto::rand::Rng + ?Sized>(&self, rng: &mut R) -> Note<Fr> {
+        let n_bits = (<Fr as PrimeFieldParams>::Inner::NUM_WORDS*<Fr as PrimeFieldParams>::Inner::WORD_BITS) as u32;
+        let v_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::V as u32/2);
         let v = BoundedNum::new(Num::from_uint(v_num).unwrap());
         Note {
             d: rng.gen(),

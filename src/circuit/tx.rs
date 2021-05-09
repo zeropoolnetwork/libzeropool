@@ -10,8 +10,8 @@ use crate::fawkes_crypto::core::{
     signal::Signal, sizedvec::SizedVec,
 };
 use crate::fawkes_crypto::native::{ecc::JubJubParams};
-use crate::fawkes_crypto::ff_uint::{Num, NumRepr, PrimeField, PrimeFieldParams};
-use crate::fawkes_crypto::circuit::cs::{RCS, SetupCS};
+use crate::fawkes_crypto::ff_uint::{Num, NumRepr, PrimeFieldParams};
+use crate::fawkes_crypto::circuit::cs::{RCS, CS};
 use crate::circuit::{
     account::CAccount,
     note::CNote
@@ -27,40 +27,37 @@ use crate::constants;
 
 
 #[derive(Clone, Signal)]
-#[Value = "TransferPub<P>"]
-#[Field = "SetupCS<P::Fr>"]
-pub struct CTransferPub<P: PoolParams> {
-    pub root: CNum<SetupCS<P::Fr>>,
-    pub nullifier: CNum<SetupCS<P::Fr>>,
-    pub out_commit: CNum<SetupCS<P::Fr>>,
-    pub delta: CNum<SetupCS<P::Fr>>, // int64 token delta, int96 energy delta, uint32 blocknumber
-    pub memo: CNum<SetupCS<P::Fr>>,
+#[Value = "TransferPub<C::Fr>"]
+pub struct CTransferPub<C:CS> {
+    pub root: CNum<C>,
+    pub nullifier: CNum<C>,
+    pub out_commit: CNum<C>,
+    pub delta: CNum<C>, // int64 token delta, int96 energy delta, uint32 blocknumber
+    pub memo: CNum<C>,
 }
 
 #[derive(Clone, Signal)]
-#[Value = "Tx<P>"]
-#[Field = "SetupCS<P::Fr>"]
-pub struct CTx<P: PoolParams> {
-    pub input: (CAccount<P>, SizedVec<CNote<P>, { constants::IN }>),
-    pub output: (CAccount<P>, CNote<P>)
+#[Value = "Tx<C::Fr>"]
+pub struct CTx<C:CS> {
+    pub input: (CAccount<C>, SizedVec<CNote<C>, { constants::IN }>),
+    pub output: (CAccount<C>, CNote<C>)
 }
 
 #[derive(Clone, Signal)]
-#[Value = "TransferSec<P>"]
-#[Field = "SetupCS<P::Fr>"]
-pub struct CTransferSec<P:PoolParams> {
-    pub tx: CTx<P>,
-    pub in_proof: (CMerkleProof<SetupCS<P::Fr>, { constants::H }>, SizedVec<CMerkleProof<SetupCS<P::Fr>, { constants::H }>, { constants::IN }>),
-    pub eddsa_s: CNum<SetupCS<P::Fr>>,
-    pub eddsa_r: CNum<SetupCS<P::Fr>>,
-    pub eddsa_a: CNum<SetupCS<P::Fr>>,
+#[Value = "TransferSec<C::Fr>"]
+pub struct CTransferSec<C:CS> {
+    pub tx: CTx<C>,
+    pub in_proof: (CMerkleProof<C, { constants::H }>, SizedVec<CMerkleProof<C, { constants::H }>, { constants::IN }>),
+    pub eddsa_s: CNum<C>,
+    pub eddsa_r: CNum<C>,
+    pub eddsa_a: CNum<C>,
 }
 
-pub fn c_nullfifier<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    account_hash: &CNum<SetupCS<Fr>>,
-    xsk: &CNum<SetupCS<Fr>>,
+pub fn c_nullfifier<C:CS, P: PoolParams<Fr = C::Fr>>(
+    account_hash: &CNum<C>,
+    xsk: &CNum<C>,
     params: &P,
-) -> CNum<SetupCS<Fr>> {
+) -> CNum<C> {
     c_poseidon(
         [account_hash.clone(), xsk.clone()].as_ref(),
         params.compress(),
@@ -68,10 +65,10 @@ pub fn c_nullfifier<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
 }
 
 
-pub fn c_note_hash<P: PoolParams>(
-    note: &CNote<P>,
+pub fn c_note_hash<C:CS, P: PoolParams<Fr = C::Fr>>(
+    note: &CNote<C>,
     params: &P,
-) -> CNum<SetupCS<P::Fr>> {
+) -> CNum<C> {
     c_poseidon(
         [
             note.d.as_num().clone(),
@@ -84,7 +81,7 @@ pub fn c_note_hash<P: PoolParams>(
     )
 }
 
-pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<SetupCS<P::Fr>> {
+pub fn c_accout_hash<C:CS, P: PoolParams<Fr = C::Fr>>(ac: &CAccount<C>, params: &P) -> CNum<C> {
     let inputs = vec![ac.xsk.clone(), ac.interval.as_num().clone(), ac.v.as_num().clone(), ac.e.as_num().clone(), ac.st.as_num().clone()];
     c_poseidon(
         &inputs,
@@ -93,11 +90,11 @@ pub fn c_accout_hash<P: PoolParams>(ac: &CAccount<P>, params: &P) -> CNum<SetupC
 }
 
 
-pub fn c_tx_hash<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    in_hash: &[CNum<SetupCS<Fr>>],
-    out_hash: &[CNum<SetupCS<Fr>>],
+pub fn c_tx_hash<C:CS, P: PoolParams<Fr = C::Fr>>(
+    in_hash: &[CNum<C>],
+    out_hash: &[CNum<C>],
     params: &P,
-) -> CNum<SetupCS<Fr>> {
+) -> CNum<C> {
     let notes = in_hash
         .iter()
         .chain(out_hash.iter())
@@ -106,20 +103,20 @@ pub fn c_tx_hash<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
     c_poseidon(&notes, params.tx())
 }
 
-pub fn c_tx_verify<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    s: &CNum<SetupCS<Fr>>,
-    r: &CNum<SetupCS<Fr>>,
-    xsk: &CNum<SetupCS<Fr>>,
-    tx_hash: &CNum<SetupCS<Fr>>,
+pub fn c_tx_verify<C:CS, P: PoolParams<Fr = C::Fr>>(
+    s: &CNum<C>,
+    r: &CNum<C>,
+    xsk: &CNum<C>,
+    tx_hash: &CNum<C>,
     params: &P,
-) -> CBool<SetupCS<Fr>> {
+) -> CBool<C> {
     c_eddsaposeidon_verify(s, r, xsk, tx_hash, params.eddsa(), params.jubjub())
 }
 
-pub fn c_derive_key_dk<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    xsk: &CNum<SetupCS<Fr>>,
+pub fn c_derive_key_dk<C:CS, P: PoolParams<Fr = C::Fr>>(
+    xsk: &CNum<C>,
     params: &P,
-) -> Vec<CBool<SetupCS<Fr>>> {
+) -> Vec<CBool<C>> {
     let cs = xsk.get_cs();
     let t_dk = c_poseidon(&[xsk.clone()], params.hash());
     let dk_value = t_dk
@@ -141,18 +138,18 @@ pub fn c_derive_key_dk<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
     dk_bits
 }
 
-pub fn c_derive_key_pk_d<Fr:PrimeField, P: PoolParams<Fr = Fr>>(
-    d: &CNum<SetupCS<Fr>>,
-    dk: &[CBool<SetupCS<Fr>>],
+pub fn c_derive_key_pk_d<C:CS, P: PoolParams<Fr = C::Fr>>(
+    d: &CNum<C>,
+    dk: &[CBool<C>],
     params: &P,
-) -> CNum<SetupCS<Fr>> {
+) -> CNum<C> {
     let d_hash = c_poseidon(&[d.clone()], params.hash());
     CEdwardsPoint::from_scalar(&d_hash, params.jubjub())
         .mul(dk, params.jubjub())
         .x
 }
 
-pub fn c_parse_delta<P:PoolParams>(delta: &CNum<SetupCS<P::Fr>>) -> (CNum<SetupCS<P::Fr>>, CNum<SetupCS<P::Fr>>, CNum<SetupCS<P::Fr>>) {
+pub fn c_parse_delta<C:CS, P:PoolParams<Fr=C::Fr>>(delta: &CNum<C>) -> (CNum<C>, CNum<C>, CNum<C>) {
     let cv = constants::V;
     let ce = constants::E;
     let ch = constants::H;
@@ -165,13 +162,13 @@ pub fn c_parse_delta<P:PoolParams>(delta: &CNum<SetupCS<P::Fr>>) -> (CNum<SetupC
     (v, e, index)
 }
 
-pub fn c_transfer<P:PoolParams>(
-    p: &CTransferPub<P>,
-    s: &CTransferSec<P>,
+pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
+    p: &CTransferPub<C>,
+    s: &CTransferSec<C>,
     params: &P,
 ) {
     //parse delta
-    let (delta_value, delta_energy, index) = c_parse_delta::<P>(&p.delta);
+    let (delta_value, delta_energy, index) = c_parse_delta::<C,P>(&p.delta);
     let mut total_value = delta_value;
     let mut total_enegry = delta_energy;
 

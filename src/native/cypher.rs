@@ -58,7 +58,7 @@ pub fn encrypt<P: PoolParams>(
     esk: Num<P::Fs>,
     sdk: Num<P::Fs>,
     adk: Num<P::Fs>,
-    item: (Account<P>, Note<P>),
+    item: (Account<P::Fr>, Note<P::Fr>),
     params: &P,
 ) -> Vec<u8> {
     let pk_d = EdwardsPoint::subgroup_decompress(item.1.pk_d, params.jubjub()).unwrap();
@@ -105,7 +105,7 @@ pub fn decrypt_in<P: PoolParams>(
     dk: Num<P::Fs>,
     msg_data: &[u8],
     params: &P,
-) -> Option<Note<P>> {
+) -> Option<Note<P::Fr>> {
     if msg_data.len() != COMMITMENT_TOTAL_SIZE {
         None
     } else {
@@ -126,7 +126,7 @@ pub fn decrypt_out<P: PoolParams>(
     sdk: Num<P::Fs>,
     msg_data: &[u8],
     params: &P,
-) -> Option<(Account<P>, Note<P>)> {
+) -> Option<(Account<P::Fr>, Note<P::Fr>)> {
     if msg_data.len() != COMMITMENT_TOTAL_SIZE {
         None
     } else {

@@ -2,7 +2,7 @@ use fawkes_crypto::native::poseidon::MerkleProof;
 use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_transfer}, constants, 
     fawkes_crypto::{
         circuit::{
-            cs::CS
+            cs::{CS, DebugCS}
         }, 
         core::signal::Signal,
         ff_uint::Num,
@@ -19,11 +19,12 @@ use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_trans
         account::Account, 
         boundednum::BoundedNum, 
         note::Note, 
-        params::{PoolBN256, PoolParams}, 
+        params::{PoolParams}, 
         tx::{derive_key_dk, derive_key_pk_d, derive_key_xsk, make_delta, Tx, TransferPub, TransferSec, nullfifier, tx_hash, tx_sign}
     }
 };
 
+use libzeropool::fawkes_crypto::engines::bn256::Fr;
 use std::time::Instant;
     
 
@@ -32,7 +33,7 @@ const N_ITEMS:usize = 1000;
 
 struct State<P:PoolParams> {
     hashes:Vec<Vec<Num<P::Fr>>>,
-    items:Vec<(Account<P>, Note<P>)>,
+    items:Vec<(Account<P::Fr>, Note<P::Fr>)>,
     default_hashes:Vec<Num<P::Fr>>,
     sk:Num<P::Fs>,
     account_id:usize,
@@ -103,12 +104,12 @@ impl<P:PoolParams> State<P> {
 
     
 
-    fn random_sample_transfer<R:Rng>(&self, rng:&mut R, params:&P) -> (TransferPub<P>, TransferSec<P>) {
+    fn random_sample_transfer<R:Rng>(&self, rng:&mut R, params:&P) -> (TransferPub<P::Fr>, TransferSec<P::Fr>) {
         let root = self.root();
         let index = N_ITEMS*2;
         let xsk = derive_key_xsk(self.sk, params).x;
         let nullifier = nullfifier(self.hashes[0][self.account_id*2] , xsk, params);
-        let memo = rng.gen();
+        let memo:Num<P::Fr> = rng.gen();
 
         
         let mut input_value = self.items[self.account_id].0.v.to_num();
@@ -124,14 +125,14 @@ impl<P:PoolParams> State<P> {
             input_energy+=self.items[i].1.v.to_num()*Num::from((index-(2*i+1)) as u32);
         }
 
-        let mut out_account: Account<P> = rng.gen();
+        let mut out_account: Account<P::Fr> = rng.gen();
         out_account.v = BoundedNum::new(input_value);
         out_account.e = BoundedNum::new(input_energy);
         out_account.interval = BoundedNum::new(Num::from(index as u32));
         out_account.xsk = xsk;
 
         
-        let mut out_note: Note<P> = rng.gen();
+        let mut out_note: Note<P::Fr> = rng.gen();
         out_note.v = BoundedNum::new(Num::ZERO);
 
         let mut input_hashes = vec![self.items[self.account_id].0.hash(params)];
@@ -144,9 +145,9 @@ impl<P:PoolParams> State<P> {
         let (eddsa_s,eddsa_r) = tx_sign(self.sk, tx_hash, params);
 
         let out_commit = poseidon(&output_hashes, params.compress());
-        let delta = make_delta::<P>(Num::ZERO, Num::ZERO, Num::from(index as u32));
+        let delta = make_delta::<P::Fr>(Num::ZERO, Num::ZERO, Num::from(index as u32));
         
-        let p = TransferPub::<P> {
+        let p = TransferPub::<P::Fr> {
             root,
             nullifier,
             out_commit,
@@ -161,7 +162,7 @@ impl<P:PoolParams> State<P> {
 
 
         
-        let s = TransferSec::<P> {
+        let s = TransferSec::<P::Fr> {
             tx,
             in_proof: (
                 self.merkle_proof(self.account_id*2),
@@ -201,25 +202,25 @@ fn test_circuit_tx_fullfill() {
     let state = State::random_sample_state(&mut rng, &*POOL_PARAMS);
     let (p, s) = state.random_sample_transfer(&mut rng, &*POOL_PARAMS);
 
-    let ref cs = CS::rc_new(true);
+    let ref cs = DebugCS::rc_new();
     let ref p = CTransferPub::alloc(cs, Some(&p));
     let ref s = CTransferSec::alloc(cs, Some(&s));
 
     
-    let mut n_constraints = cs.borrow().num_constraints();
+    let mut num_gates = cs.borrow().num_gates();
     let start = Instant::now();
     c_transfer(p, s, &*POOL_PARAMS);
     let duration = start.elapsed();
-    n_constraints=cs.borrow().num_constraints()-n_constraints;
+    num_gates=cs.borrow().num_gates()-num_gates;
 
-    println!("tx constraints = {}", n_constraints);
+    println!("tx gates = {}", num_gates);
     println!("Time elapsed in c_transfer() is: {:?}", duration);
 }
 
 
 #[test]
 fn test_circuit_tx_setup_and_prove() {
-    fn circuit(public: CTransferPub<PoolBN256>, secret: CTransferSec<PoolBN256>) {
+    fn circuit<C:CS<Fr=Fr>>(public: CTransferPub<C>, secret: CTransferSec<C>) {
         c_transfer(&public, &secret, &*POOL_PARAMS);
     }
 
@@ -244,47 +245,4 @@ fn test_circuit_tx_setup_and_prove() {
 
     assert!(res, "Verifier result should be true");
 }
-
-
-
-
-
-    // use super::*;
-    // use crate::circuit::num::CNum;
-    // use crate::circuit::poseidon::{c_poseidon_merkle_proof_root, CMerkleProof};
-    // use crate::core::signal::Signal;
-    // use crate::core::sizedvec::SizedVec;
-    // use crate::engines::bn256::Fr;
-    // use crate::native::poseidon::{poseidon_merkle_proof_root, MerkleProof, PoseidonParams};
-    // use crate::typenum::U32;
-    // use crate::rand::{thread_rng, Rng};
-    // use ff_uint::PrimeField;
-
-    // #[test]
-    // fn test_circuit_poseidon_merkle_root() {
-    //     fn circuit<Fr: PrimeField>(public: CNum<Fr>, secret: (CNum<Fr>, CMerkleProof<Fr, U32>)) {
-    //         let poseidon_params = PoseidonParams::<Fr>::new(3, 8, 53);
-    //         let res = c_poseidon_merkle_proof_root(&secret.0, &secret.1, &poseidon_params);
-    //         res.assert_eq(&public);
-    //     }
-    //     let params = setup::<Bn256, _, _, _>(circuit);
-
-    //     const PROOF_LENGTH: usize = 32;
-    //     let mut rng = thread_rng();
-    //     let poseidon_params = PoseidonParams::<Fr>::new(3, 8, 53);
-    //     let leaf = rng.gen();
-    //     let sibling = (0..PROOF_LENGTH)
-    //         .map(|_| rng.gen())
-    //         .collect::<SizedVec<_, U32>>();
-    //     let path = (0..PROOF_LENGTH)
-    //         .map(|_| rng.gen())
-    //         .collect::<SizedVec<bool, U32>>();
-    //     let proof = MerkleProof { sibling, path };
-    //     let root = poseidon_merkle_proof_root(leaf, &proof, &poseidon_params);
-
-    //     let (inputs, snark_proof) = prover::prove(&params, &root, &(leaf, proof), circuit);
-
-    //     let res = verifier::verify(&params.get_vk(), &snark_proof, &inputs);
-    //     assert!(res, "Verifier result should be true");
-    // }
 

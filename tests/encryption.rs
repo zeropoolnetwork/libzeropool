@@ -1,4 +1,4 @@
-use libzeropool::{POOL_PARAMS, native::{params::PoolBN256, tx::{derive_key_adk, derive_key_dk, derive_key_sdk}}};
+use libzeropool::{POOL_PARAMS, native::{tx::{derive_key_adk, derive_key_dk, derive_key_sdk}}};
 
 use libzeropool::fawkes_crypto::rand::{thread_rng, Rng};
 use libzeropool::native::{
@@ -7,6 +7,8 @@ use libzeropool::native::{
     tx::{derive_key_pk_d},
     cypher
 };
+
+use libzeropool::fawkes_crypto::engines::bn256::Fr;
 
 
 #[test]
@@ -20,8 +22,8 @@ fn test_encryption() {
     let receiver_dk = derive_key_dk(receiver_xsk, &*POOL_PARAMS);
 
 
-    let mut account: Account<PoolBN256> = rng.gen();
-    let mut note: Note<PoolBN256> = rng.gen();
+    let mut account: Account<Fr> = rng.gen();
+    let mut note: Note<Fr> = rng.gen();
     
     account.xsk = sender_xsk;
     note.pk_d = derive_key_pk_d(note.d.as_num().clone(), receiver_dk, &*POOL_PARAMS).x;

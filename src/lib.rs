@@ -15,16 +15,22 @@ use fawkes_crypto::native::poseidon::PoseidonParams;
 
 use lazy_static::lazy_static;
 
+fn gen_poseidon_params(n:usize) -> PoseidonParams<Fr> {
+    let t = n+1;
+    let r_p =  f64::ceil(53.75 + 1.075*f64::log(t as f64, 5.0)) as usize;
+    PoseidonParams::<Fr>::new(t, 8, r_p)
+}
+
 
 //TODO recalculate
 lazy_static! {
     pub static ref POOL_PARAMS: PoolBN256 = PoolBN256 {
         jubjub: JubJubBN256::new(),
-        hash: PoseidonParams::<Fr>::new(2, 8, 53),
-        compress: PoseidonParams::<Fr>::new(3, 8, 53),
-        note: PoseidonParams::<Fr>::new(5, 8, 54),
-        account: PoseidonParams::<Fr>::new(6, 8, 54),
-        tx: PoseidonParams::<Fr>::new(12, 8, 54),
-        eddsa: PoseidonParams::<Fr>::new(4, 8, 53),
+        hash: gen_poseidon_params(1),
+        compress: gen_poseidon_params(2),
+        note: gen_poseidon_params(4),
+        account: gen_poseidon_params(5),
+        eddsa: gen_poseidon_params(3),
+        sponge: gen_poseidon_params(5),
     };
 }

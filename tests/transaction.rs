@@ -1,4 +1,4 @@
-use fawkes_crypto::native::poseidon::MerkleProof;
+use fawkes_crypto::{native::poseidon::MerkleProof};
 use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_transfer}, constants, 
     fawkes_crypto::{
         circuit::{
@@ -20,7 +20,8 @@ use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_trans
         boundednum::BoundedNum, 
         note::Note, 
         params::{PoolParams}, 
-        tx::{derive_key_dk, derive_key_pk_d, derive_key_xsk, make_delta, Tx, TransferPub, TransferSec, nullfifier, tx_hash, tx_sign}
+        tx::{make_delta, Tx, TransferPub, TransferSec, nullifier, tx_hash, tx_sign, out_commitment_hash},
+        key::{derive_key_a, derive_key_eta, derive_key_p_d}
     }
 };
 
@@ -35,35 +36,35 @@ struct State<P:PoolParams> {
     hashes:Vec<Vec<Num<P::Fr>>>,
     items:Vec<(Account<P::Fr>, Note<P::Fr>)>,
     default_hashes:Vec<Num<P::Fr>>,
-    sk:Num<P::Fs>,
+    sigma:Num<P::Fs>,
     account_id:usize,
     note_id:Vec<usize>
 }
 
 impl<P:PoolParams> State<P> {
     fn random_sample_state<R:Rng>(rng:&mut R, params:&P) -> Self {
-        let sk = rng.gen();
-        let xsk = derive_key_xsk(sk, params).x;
-        let dk = derive_key_dk(xsk, params);
+        let sigma = rng.gen();
+        let a = derive_key_a(sigma, params);
+        let eta = derive_key_eta(a.x, params);
 
 
         let account_id = rng.gen_range(0, N_ITEMS);
         let note_id = rand::seq::index::sample(rng, N_ITEMS, constants::IN).into_vec();
 
 
-        let mut items:Vec<(Account<_>, Note<_>)> = (0..N_ITEMS).map(|_| (rng.gen(), rng.gen())).collect();
+        let mut items:Vec<(Account<_>, Note<_>)> = (0..N_ITEMS).map(|_| (rng.gen(), Note::sample(rng, params) )).collect();
 
         for i in note_id.iter().cloned() {
-            items[i].1.pk_d = derive_key_pk_d(items[i].1.d.to_num(), dk, params).x;
+            items[i].1.p_d = derive_key_p_d(items[i].1.d.to_num(), eta, params).x;
         }
 
-        items[account_id].0.xsk = xsk;
-        items[account_id].0.interval = BoundedNum::new(Num::ZERO);
+        items[account_id].0.eta = eta;
+        items[account_id].0.i = BoundedNum::new(Num::ZERO);
 
-        let mut default_hashes = vec![Num::ZERO;constants::H+1];
+        let mut default_hashes = vec![Num::ZERO;constants::HEIGHT+1];
         let mut hashes = vec![];
 
-        for i in 0..constants::H {
+        for i in 0..constants::HEIGHT {
             let t = default_hashes[i];
             default_hashes[i+1] = poseidon([t,t].as_ref(), params.compress());
         }
@@ -81,7 +82,7 @@ impl<P:PoolParams> State<P> {
             hashes.push(t);
         }
 
-        for i in 0..constants::H {
+        for i in 0..constants::HEIGHT {
             let mut t = vec![];
             for j in 0..hashes[i].len()>>1 {
                 t.push(poseidon([hashes[i][2*j],hashes[i][2*j+1]].as_ref(), params.compress()));
@@ -96,7 +97,7 @@ impl<P:PoolParams> State<P> {
             hashes,
             items,
             default_hashes,
-            sk,
+            sigma,
             account_id,
             note_id
         }
@@ -107,33 +108,34 @@ impl<P:PoolParams> State<P> {
     fn random_sample_transfer<R:Rng>(&self, rng:&mut R, params:&P) -> (TransferPub<P::Fr>, TransferSec<P::Fr>) {
         let root = self.root();
         let index = N_ITEMS*2;
-        let xsk = derive_key_xsk(self.sk, params).x;
-        let nullifier = nullfifier(self.hashes[0][self.account_id*2] , xsk, params);
+        let a = derive_key_a(self.sigma, params);
+        let eta = derive_key_eta(a.x, params);
+        let nullifier = nullifier(self.hashes[0][self.account_id*2] , eta, params);
         let memo:Num<P::Fr> = rng.gen();
 
         
-        let mut input_value = self.items[self.account_id].0.v.to_num();
+        let mut input_value = self.items[self.account_id].0.b.to_num();
         for &i in self.note_id.iter() {
-            input_value+=self.items[i].1.v.to_num();
+            input_value+=self.items[i].1.b.to_num();
         }
 
         let mut input_energy = self.items[self.account_id].0.e.to_num();
-        input_energy += self.items[self.account_id].0.v.to_num()*(Num::from(index as u32) - self.items[self.account_id].0.interval.to_num()) ;
+        input_energy += self.items[self.account_id].0.b.to_num()*(Num::from(index as u32) - self.items[self.account_id].0.i.to_num()) ;
 
 
         for &i in self.note_id.iter() {
-            input_energy+=self.items[i].1.v.to_num()*Num::from((index-(2*i+1)) as u32);
+            input_energy+=self.items[i].1.b.to_num()*Num::from((index-(2*i+1)) as u32);
         }
 
         let mut out_account: Account<P::Fr> = rng.gen();
-        out_account.v = BoundedNum::new(input_value);
+        out_account.b = BoundedNum::new(input_value);
         out_account.e = BoundedNum::new(input_energy);
-        out_account.interval = BoundedNum::new(Num::from(index as u32));
-        out_account.xsk = xsk;
+        out_account.i = BoundedNum::new(Num::from(index as u32));
+        out_account.eta = eta;
 
         
-        let mut out_note: Note<P::Fr> = rng.gen();
-        out_note.v = BoundedNum::new(Num::ZERO);
+        let mut out_note: Note<P::Fr> = Note::sample(rng, params);
+        out_note.b = BoundedNum::new(Num::ZERO);
 
         let mut input_hashes = vec![self.items[self.account_id].0.hash(params)];
         for &i in self.note_id.iter() {
@@ -141,8 +143,9 @@ impl<P:PoolParams> State<P> {
         }
 
         let output_hashes = vec![out_account.hash(params), out_note.hash(params)];
-        let tx_hash = tx_hash(&input_hashes, &output_hashes, params);
-        let (eddsa_s,eddsa_r) = tx_sign(self.sk, tx_hash, params);
+        let out_ch = out_commitment_hash(&output_hashes, params);
+        let tx_hash = tx_hash(&input_hashes, out_ch, params);
+        let (eddsa_s,eddsa_r) = tx_sign(self.sigma, tx_hash, params);
 
         let out_commit = poseidon(&output_hashes, params.compress());
         let delta = make_delta::<P::Fr>(Num::ZERO, Num::ZERO, Num::from(index as u32));
@@ -154,10 +157,10 @@ impl<P:PoolParams> State<P> {
             delta,
             memo,  
         };
-
+    
         let tx = Tx {
             input: (self.items[self.account_id].0.clone(), self.note_id.iter().map(|&i| self.items[i].1.clone()).collect()),
-            output: (out_account, out_note)
+            output: (out_account, vec![out_note].into_iter().collect() )
         };
 
 
@@ -170,7 +173,7 @@ impl<P:PoolParams> State<P> {
             ),
             eddsa_s:eddsa_s.to_other().unwrap(),
             eddsa_r,
-            eddsa_a:xsk
+            eddsa_a:a.x
         };
 
         (p, s)
@@ -184,14 +187,14 @@ impl<P:PoolParams> State<P> {
         }
     }
 
-    fn merkle_proof(&self, id:usize) -> MerkleProof<P::Fr, { constants::H }> {
-        let sibling = (0..constants::H).map(|i| self.cell(i, (id>>i)^1)).collect();
-        let path =  (0..constants::H).map(|i| (id>>i)&1==1).collect();
+    fn merkle_proof(&self, id:usize) -> MerkleProof<P::Fr, { constants::HEIGHT }> {
+        let sibling = (0..constants::HEIGHT).map(|i| self.cell(i, (id>>i)^1)).collect();
+        let path =  (0..constants::HEIGHT).map(|i| (id>>i)&1==1).collect();
         MerkleProof {sibling, path}
     }
 
     fn root(&self) -> Num<P::Fr> {
-        return self.hashes[constants::H][0]
+        return self.hashes[constants::HEIGHT][0]
     }
 
 }

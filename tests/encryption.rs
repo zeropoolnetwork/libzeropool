@@ -1,11 +1,11 @@
-use libzeropool::{POOL_PARAMS, native::{tx::{derive_key_adk, derive_key_dk, derive_key_sdk}}};
+use libzeropool::POOL_PARAMS;
 
 use libzeropool::fawkes_crypto::rand::{thread_rng, Rng};
 use libzeropool::native::{
     note::Note,
     account::Account,
-    tx::{derive_key_pk_d},
-    cypher
+    key::{derive_key_p_d},
+    cipher
 };
 
 use libzeropool::fawkes_crypto::engines::bn256::Fr;
@@ -14,32 +14,32 @@ use libzeropool::fawkes_crypto::engines::bn256::Fr;
 #[test]
 fn test_encryption() {
     let mut rng = thread_rng();
-    let sender_xsk = rng.gen();
-    let sender_sdk = derive_key_sdk(sender_xsk, &*POOL_PARAMS);
-    let sender_adk = derive_key_adk(sender_xsk, &*POOL_PARAMS);
-
-    let receiver_xsk = rng.gen();
-    let receiver_dk = derive_key_dk(receiver_xsk, &*POOL_PARAMS);
+    let sender_eta = rng.gen();
+    let receiver_eta = rng.gen();
 
 
     let mut account: Account<Fr> = rng.gen();
-    let mut note: Note<Fr> = rng.gen();
+    let mut note:Vec<Note<Fr>> = (0..2).map(|_| Note::sample(&mut rng, &*POOL_PARAMS)).collect();
     
-    account.xsk = sender_xsk;
-    note.pk_d = derive_key_pk_d(note.d.as_num().clone(), receiver_dk, &*POOL_PARAMS).x;
+    
+    account.eta = sender_eta;
+    note[0].p_d = derive_key_p_d(note[0].d.as_num().clone(), receiver_eta, &*POOL_PARAMS).x;
     
 
-    let esk = rng.gen();
+    let ciphertext = cipher::encrypt(&(0..32).map(|_| rng.gen()).collect::<Vec<_>>(), sender_eta, account, &note, &*POOL_PARAMS);
 
-    let data = cypher::encrypt(esk, sender_sdk, sender_adk, (account.clone(), note.clone()), &*POOL_PARAMS);
+    let result_out = cipher::decrypt_out(sender_eta, &ciphertext, &*POOL_PARAMS);
 
-    let decr_in = cypher::decrypt_in(receiver_dk, &data, &*POOL_PARAMS);
-    assert!(decr_in.is_some(), "Could not decrypt incoming data");
-    assert!(decr_in.unwrap()==note, "Wrong note decryption");
+    assert!(result_out.is_some(), "Could not decrypt outgoing data.");
+        let (account_out, note_out) = result_out.unwrap();
+        assert!(note.len()==note_out.len() && 
+        note.iter().zip(note_out.iter()).all(|(l,r)| l==r) &&
+        account == account_out, "Wrong outgoing data decrypted");
 
-    let decr_out = cypher::decrypt_out(sender_xsk, sender_adk, sender_sdk, &data, &*POOL_PARAMS);
-    assert!(decr_out.is_some(), "Could not decrypt outgoing data.");
-    let (decr_account, decr_note) = decr_out.unwrap();
-    assert!(decr_account==account && decr_note==note, "Wrong (account, note) decryption.");
+
+    let result_out = cipher::decrypt_in(receiver_eta, &ciphertext, &*POOL_PARAMS);
+
+    assert!(result_out.len()==2 && result_out[0].is_some() && result_out[0].unwrap()==note[0] && result_out[1].is_none(), "Wrong incoming data decrypted");
+
 
 }

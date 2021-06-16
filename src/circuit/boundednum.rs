@@ -3,10 +3,7 @@ use crate::fawkes_crypto::circuit::{
     bool::CBool,
     num::CNum,
 };
-use crate::fawkes_crypto::core::{
-    signal::Signal, 
-};
-
+use crate::fawkes_crypto::core::signal::Signal;
 use crate::fawkes_crypto::ff_uint::{NumRepr, PrimeFieldParams};
 use crate::fawkes_crypto::circuit::cs::{RCS, CS};
 use crate::native::boundednum::BoundedNum;

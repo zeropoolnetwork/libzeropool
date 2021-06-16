@@ -3,4 +3,7 @@ pub mod boundednum;
 pub mod note;
 pub mod params;
 pub mod account;
-pub mod cypher;
+pub mod cipher;
+pub mod key;
+mod borsh;
+mod sample;

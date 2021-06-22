@@ -166,11 +166,14 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         //assert root == cur_root || account.is_dummy()
         ((cur_root - &p.root) * s.tx.input.0.is_dummy_raw()).assert_zero();
 
-        //output_index > input_index
-        c_comp(output_index, input_index, HEIGHT).assert_const(&true);
+        //input_index <= output_index
+        c_comp(input_index, output_index, HEIGHT).assert_const(&false);
 
         //output_index <= current_index
         c_comp(output_index, &current_index, HEIGHT).assert_const(&false);
+
+        //protect from burning the account at zero self-transfer case
+        (s.tx.input.0.t.as_num()-s.tx.output.0.t.as_num()).assert_nonzero();
 
         //compute enegry
         total_enegry += s.tx.input.0.b.as_num() * (output_index- input_index);
@@ -187,7 +190,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
         //note_index >= account_in.interval && note_index < account_out.interval || note_index == 0 && value == 0
 
-        //input_index <= note_index && note_index < output_index || note_is_dummy
+        //input_index <= note_index && note_index < output_index || note_dummy
         let note_index_ok = (!c_comp(input_index, note_index, HEIGHT)) & c_comp(output_index, note_index, HEIGHT);
         let note_dummy = s.tx.input.1[i].is_dummy_raw().is_zero();
         (note_index_ok | note_dummy).assert_const(&true);

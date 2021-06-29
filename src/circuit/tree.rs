@@ -47,13 +47,15 @@ pub fn tree_update<C:CS, P:PoolParams<Fr=C::Fr>>(
 
     (c_poseidon_merkle_proof_root(&zero_leaf, &s.proof_free, params.compress()) - &p.root_before).assert_zero();
     (c_poseidon_merkle_proof_root(&p.leaf, &s.proof_free, params.compress()) - &p.root_after).assert_zero();
-    (c_poseidon_merkle_proof_root(&s.prev_leaf, &s.proof_filled, params.compress()) - &p.root_before).assert_zero();
-    (index_filled+Num::ONE-&index_free).assert_zero();
 
-    // prev_leaf!=0 or index_free == 0
-    ((!s.prev_leaf.is_zero())|index_free.is_zero()).assert_const(&true);
+    let index_free_zero = (&index_free-zero_leaf_value).is_zero();
 
-
+    let prev_proof_expr = (c_poseidon_merkle_proof_root(&s.prev_leaf, &s.proof_filled, params.compress()) - &p.root_before).is_zero();
+    let prev_index_expr = (index_filled+Num::ONE-&index_free).is_zero();
+    let prev_leaf_expr = !s.prev_leaf.is_zero();
+    
+    //for non-empty tree previous proof should be valid for nonzero leaf
+    ((prev_proof_expr & prev_index_expr & prev_leaf_expr) | index_free_zero).assert_const(&true);
 
 
 }

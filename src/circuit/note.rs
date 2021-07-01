@@ -34,6 +34,6 @@ impl<C:CS> CNote<C> {
     }
 
     pub fn is_zero(&self) -> CBool<C> {
-        (self.d.as_num() + &self.p_d + self.b.as_num() + self.t.as_num()).is_zero()
+        (self.d.as_num() + self.b.as_num() + self.t.as_num()).is_zero() & self.p_d.is_zero()
     }
 }

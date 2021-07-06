@@ -43,19 +43,25 @@ pub fn tree_update<C:CS, P:PoolParams<Fr=C::Fr>>(
         zero_leaf_value = poseidon(&[zero_leaf_value, zero_leaf_value], params.compress());
     }
 
+    let mut zero_root_value = Num::ZERO;
+    for _ in 0..HEIGHT {
+        zero_root_value = poseidon(&[zero_root_value, zero_root_value], params.compress());
+    }
+
+
     let zero_leaf:CNum<C> = p.derive_const(&zero_leaf_value);
 
     (c_poseidon_merkle_proof_root(&zero_leaf, &s.proof_free, params.compress()) - &p.root_before).assert_zero();
     (c_poseidon_merkle_proof_root(&p.leaf, &s.proof_free, params.compress()) - &p.root_after).assert_zero();
 
-    let index_free_zero = (&index_free-zero_leaf_value).is_zero();
+    let empty_tree = (&p.root_before-zero_root_value).is_zero();
 
     let prev_proof_expr = (c_poseidon_merkle_proof_root(&s.prev_leaf, &s.proof_filled, params.compress()) - &p.root_before).is_zero();
     let prev_index_expr = (index_filled+Num::ONE-&index_free).is_zero();
     let prev_leaf_expr = !(&s.prev_leaf-zero_leaf_value).is_zero();
     
     //for non-empty tree previous proof should be valid for nonzero leaf
-    ((prev_proof_expr & prev_index_expr & prev_leaf_expr) | index_free_zero).assert_const(&true);
+    ((prev_proof_expr & prev_index_expr & prev_leaf_expr) | empty_tree).assert_const(&true);
 
 
 }

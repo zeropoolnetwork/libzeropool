@@ -113,8 +113,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
     //assert input notes are unique
     let mut t:CNum<C> = p.derive_const(&Num::ZERO);
-    for i in 0..OUT {
-        for j in i+1..OUT {
+    for i in 0..IN {
+        for j in i+1..IN {
             t+=(&in_note_hash[i]-&in_note_hash[j]).is_zero().as_num();
         }
     }

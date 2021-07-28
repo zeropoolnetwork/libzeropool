@@ -1,17 +1,7 @@
-pub const SEED_DIVERSIFIER: &'static [u8]= b"diversifier";
-pub const SEED_DECRYPTION_KEY: &'static [u8] = b"decryption_key";
-pub const SEED_IN_NOTE_HASH: &'static [u8] = b"in_note_hash";
-pub const SEED_OUT_NOTE_HASH: &'static [u8] = b"out_note_hash";
-pub const SEED_TX_HASH: &'static [u8] = b"tx_hash";
-pub const SEED_NULLIFIER: &'static [u8] = b"nullifier";
-pub const SEED_NOTE_HASH: &'static [u8] = b"note";
-
-
-
 pub const IN: usize = 8;
-pub const OUTLOG: usize = 1;
+pub const OUTLOG: usize = 7;
 pub const OUT: usize = (1<<OUTLOG)-1;
-pub const HEIGHT: usize = 32;
+pub const HEIGHT: usize = 48;
 pub const DIVERSIFIER_SIZE: usize = 80;
 pub const BALANCE_SIZE: usize = 64;
 pub const ENERGY_SIZE: usize = BALANCE_SIZE+HEIGHT;

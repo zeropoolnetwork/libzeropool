@@ -106,6 +106,14 @@ impl<P:PoolParams> State<P> {
     
 
     fn random_sample_transfer<R:Rng>(&self, rng:&mut R, params:&P) -> (TransferPub<P::Fr>, TransferSec<P::Fr>) {
+
+        let zero_note = Note {
+            d: BoundedNum::new(Num::ZERO),
+            p_d: Num::ZERO,
+            b: BoundedNum::new(Num::ZERO),
+            t: BoundedNum::new(Num::ZERO),
+        };
+
         let root = self.root();
         let index = N_ITEMS*2;
         let a = derive_key_a(self.sigma, params);
@@ -142,12 +150,13 @@ impl<P:PoolParams> State<P> {
             input_hashes.push(self.items[i].1.hash(params));
         }
 
-        let output_hashes = vec![out_account.hash(params), out_note.hash(params)];
-        let out_ch = out_commitment_hash(&output_hashes, params);
-        let tx_hash = tx_hash(&input_hashes, out_ch, params);
+        let out_notes:Vec<_> = std::iter::once(out_note).chain(core::iter::repeat(zero_note).take(constants::OUT-1)).collect();
+        let out_hashes:Vec<_> = std::iter::once(out_account.hash(params)).chain(out_notes.iter().map(|n| n.hash(params))).collect();
+        let out_commit = out_commitment_hash(&out_hashes, params);
+        let tx_hash = tx_hash(&input_hashes, out_commit, params);
         let (eddsa_s,eddsa_r) = tx_sign(self.sigma, tx_hash, params);
 
-        let out_commit = poseidon(&output_hashes, params.compress());
+
         let delta = make_delta::<P::Fr>(Num::ZERO, Num::ZERO, Num::from(index as u32));
         
         let p = TransferPub::<P::Fr> {
@@ -157,10 +166,14 @@ impl<P:PoolParams> State<P> {
             delta,
             memo,  
         };
+
+
+
+        
     
         let tx = Tx {
             input: (self.items[self.account_id].0.clone(), self.note_id.iter().map(|&i| self.items[i].1.clone()).collect()),
-            output: (out_account, vec![out_note].into_iter().collect() )
+            output: (out_account, out_notes.iter().cloned().collect() )
         };
 
 

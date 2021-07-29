@@ -6,8 +6,11 @@ use serde_json;
 pub mod constants;
 pub mod native;
 pub mod circuit;
+pub mod helpers;
+
 
 use crate::native::params::PoolBN256;
+
 
 
 
@@ -15,6 +18,10 @@ use fawkes_crypto::engines::bn256::{JubJubBN256, Fr};
 use fawkes_crypto::native::poseidon::PoseidonParams;
 
 use lazy_static::lazy_static;
+
+
+#[cfg(feature="cli_libzeropool_setup")]
+pub use clap;
 
 
 lazy_static! {

@@ -1,4 +1,4 @@
-pub const IN: usize = 8;
+pub const IN: usize = 3;
 pub const OUTLOG: usize = 7;
 pub const OUT: usize = (1<<OUTLOG)-1;
 pub const HEIGHT: usize = 48;

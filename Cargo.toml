@@ -9,13 +9,25 @@ crate-type = ["rlib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+path = "src/setup/main.rs"
+name = "libzeropool-setup"
+required-features = ["cli_libzeropool_setup"] 
+
 [dependencies]
-fawkes-crypto = { version = "4.2.1", features = ["rand_support"] }
+fawkes-crypto = { version = "4.2.3", features = ["rand_support"] }
+
+
 sha3 = "0.9.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0"}
 lazy_static = "1.4.0"
 chacha20poly1305 = "0.8.0"
+clap={ package = "clap-v3", version = "3.0.0-beta.1", optional=true}
+
+[features]
+cli_libzeropool_setup = ["clap", "fawkes-crypto/rand_support", "fawkes-crypto/backend_bellman_groth16"]
+default=["cli_libzeropool_setup"]
 
 [dev-dependencies]
-fawkes-crypto = { version = "4.2.1", features = ["rand_support", "backend_bellman_groth16"] }
+fawkes-crypto = { version = "4.2.3", features = ["rand_support", "backend_bellman_groth16"] }

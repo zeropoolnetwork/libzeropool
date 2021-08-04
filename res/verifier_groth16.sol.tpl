@@ -129,8 +129,8 @@ contract Verifier {
         *          above and the public inputs
         */
     function verifyProof(
-        uint256[8] memory p,
-        uint256[<%vk_input_length%>] memory input
+        uint256[<%vk_input_length%>] memory input,
+        uint256[8] memory p
     ) public view returns (bool) {
  
         // Make sure that each element in the proof is less than the prime q

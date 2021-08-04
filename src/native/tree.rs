@@ -12,6 +12,7 @@ use std::fmt::Debug;
 
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(bound(serialize = "", deserialize = ""))]
 pub struct TreePub<Fr:PrimeField> {
     pub root_before: Num<Fr>,
     pub root_after: Num<Fr>,
@@ -19,6 +20,7 @@ pub struct TreePub<Fr:PrimeField> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(bound(serialize = "", deserialize = ""))]
 pub struct TreeSec<Fr:PrimeField> {
     pub proof_filled:MerkleProof<Fr, {HEIGHT - OUTLOG}>,
     pub proof_free:MerkleProof<Fr, {HEIGHT - OUTLOG}>,

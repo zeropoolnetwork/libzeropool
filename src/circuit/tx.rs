@@ -179,7 +179,6 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         total_enegry += s.tx.input.0.b.as_num() * (output_index- input_index);
     }
 
-    //let account_index = c_from_bits_le(s.in_proof.0.path.as_slice());
 
     for i in 0..IN {
         let note_value = s.tx.input.1[i].b.as_num();

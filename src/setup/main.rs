@@ -1,7 +1,10 @@
 mod evm_verifier;
 
-use libzeropool::{clap::Clap, POOL_PARAMS, 
-    circuit::tx::{c_transfer, CTransferPub, CTransferSec}
+use libzeropool::{
+    POOL_PARAMS,
+    circuit::tree::{tree_update, CTreePub, CTreeSec},
+    circuit::tx::{c_transfer, CTransferPub, CTransferSec},
+    clap::Clap,
 };
 use std::{fs::File, io::Write};
 
@@ -32,12 +35,15 @@ enum SubCommand {
     /// Generate verifier smart contract
     GenerateVerifier(GenerateVerifierOpts),
     /// Generate test object
-    GenerateTestData(GenerateTestDataOpts)
+    GenerateTestData(GenerateTestDataOpts),
 }
 
 /// A subcommand for generating a SNARK proof
 #[derive(Clap)]
 struct ProveOpts {
+    /// Circuit for prooving
+    #[clap(short = "c", long = "circuit", default_value = "c_transfer")]
+    circuit: String,
     /// Snark trusted setup parameters file
     #[clap(short = "p", long = "params", default_value = "params.bin")]
     params: String,
@@ -69,6 +75,9 @@ struct VerifyOpts {
 /// A subcommand for generating a trusted setup parameters
 #[derive(Clap)]
 struct SetupOpts {
+    /// Circuit for parameter generation
+    #[clap(short = "c", long = "circuit", default_value = "c_transfer")]
+    circuit: String,
     /// Snark trusted setup parameters file
     #[clap(short = "p", long = "params", default_value = "params.bin")]
     params: String,
@@ -83,7 +92,10 @@ struct GenerateVerifierOpts {
     /// Snark verification key
     #[clap(short = "v", long = "vk", default_value = "verification_key.json")]
     vk: String,
-    /// Output smart contract name
+    /// Smart contract name
+    #[clap(short = "n", long = "name", default_value = "Verifier")]
+    contract_name: String,
+    /// Output file name
     #[clap(short = "s", long = "solidity", default_value = "verifier.sol")]
     solidity: String,
 }
@@ -95,13 +107,20 @@ struct GenerateTestDataOpts {
     object: String
 }
 
+fn tree_circuit<C:CS<Fr=Fr>>(public: CTreePub<C>, secret: CTreeSec<C>) {
+    tree_update(&public, &secret, &*POOL_PARAMS);
+}
 
-fn circuit<C:CS<Fr=Fr>>(public: CTransferPub<C>, secret: CTransferSec<C>) {
+fn tx_circuit<C:CS<Fr=Fr>>(public: CTransferPub<C>, secret: CTransferSec<C>) {
     c_transfer(&public, &secret, &*POOL_PARAMS);
 }
 
 fn cli_setup(o:SetupOpts) {
-    let params = setup::<Bn256, _, _, _>(circuit);
+    let params = if o.circuit.eq("tree_update") {
+        setup::<Bn256, _, _, _>(tree_circuit)
+    } else {
+        setup::<Bn256, _, _, _>(tx_circuit)
+    };
     let vk = params.get_vk();
     let vk_str = serde_json::to_string_pretty(&vk).unwrap();
 
@@ -114,7 +133,7 @@ fn cli_setup(o:SetupOpts) {
 fn cli_generate_verifier(o: GenerateVerifierOpts) {
     let vk_str = std::fs::read_to_string(o.vk).unwrap();
     let vk :VK<Bn256> = serde_json::from_str(&vk_str).unwrap();
-    let sol_str = generate_sol_data(&vk);
+    let sol_str = generate_sol_data(&vk, o.contract_name);
     File::create(o.solidity).unwrap().write(&sol_str.into_bytes()).unwrap();
     println!("solidity verifier generated")
 }
@@ -148,9 +167,13 @@ fn cli_prove(o:ProveOpts) {
     let params = Parameters::<Bn256>::read(&mut params_data_cur, false, false).unwrap();
     let object_str = std::fs::read_to_string(o.object).unwrap();
 
-    let (public, secret) = serde_json::from_str(&object_str).unwrap();
-    
-    let (inputs, snark_proof) = prove(&params, &public, &secret, circuit);
+    let (inputs, snark_proof) = if o.circuit.eq("tree_update") {
+        let (public, secret) = serde_json::from_str(&object_str).unwrap();
+        prove(&params, &public, &secret, tree_circuit)
+    } else {
+        let (public, secret) = serde_json::from_str(&object_str).unwrap();
+        prove(&params, &public, &secret, tx_circuit)
+    };
 
 
     let proof_str = serde_json::to_string_pretty(&snark_proof).unwrap();

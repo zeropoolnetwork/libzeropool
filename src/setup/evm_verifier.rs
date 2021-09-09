@@ -9,7 +9,7 @@ pub fn generate_sol_data(vk:&VK<Bn256>) -> String {
     }
 
     fn stringify_g2(p:&G2Point<Bn256>) -> String {
-        format!("[{}, {}], [{}, {}]", p.0.0.to_string(), p.0.1.to_string(), p.1.0.to_string(), p.1.1.to_string()).to_string()
+        format!("[{}, {}], [{}, {}]", p.0.1.to_string(), p.0.0.to_string(), p.1.1.to_string(), p.1.0.to_string()).to_string()
     }
 
     let mut tpl = tpl.replace("<%vk_alfa1%>", &stringify_g1(&vk.alpha));

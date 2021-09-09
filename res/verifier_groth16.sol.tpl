@@ -139,7 +139,7 @@ contract Verifier {
         }
         Proof memory _proof;
         _proof.A = Pairing.G1Point(p[0], p[1]);
-        _proof.B = Pairing.G2Point([p[2], p[3]], [p[4], p[5]]);
+        _proof.B = Pairing.G2Point([p[3], p[2]], [p[5], p[4]]);
         _proof.C = Pairing.G1Point(p[6], p[7]);
         VerifyingKey memory vk = verifyingKey();
         // Compute the linear combination vk_x

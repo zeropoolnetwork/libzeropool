@@ -6,6 +6,7 @@ use libzeropool::{
     circuit::tx::{c_transfer, CTransferPub, CTransferSec},
     clap::Clap,
 };
+use core::panic;
 use std::{fs::File, io::Write};
 
 use fawkes_crypto::engines::bn256::Fr;
@@ -41,70 +42,79 @@ enum SubCommand {
 /// A subcommand for generating a SNARK proof
 #[derive(Clap)]
 struct ProveOpts {
-    /// Circuit for prooving
-    #[clap(short = "c", long = "circuit", default_value = "c_transfer")]
+    /// Circuit for prooving (transfer|tree_update)
+    #[clap(short = "c", long = "circuit", default_value = "transfer")]
     circuit: String,
     /// Snark trusted setup parameters file
-    #[clap(short = "p", long = "params", default_value = "params.bin")]
-    params: String,
+    #[clap(short = "p", long = "params")]
+    params: Option<String>,
     /// Input object JSON file
-    #[clap(short = "o", long = "object", default_value = "object.json")]
-    object: String,
+    #[clap(short = "o", long = "object")]
+    object: Option<String>,
     /// Output file for proof JSON
-    #[clap(short = "r", long = "proof", default_value = "proof.json")]
-    proof: String,
+    #[clap(short = "r", long = "proof")]
+    proof: Option<String>,
     /// Output file for public inputs JSON
-    #[clap(short = "i", long = "inputs", default_value = "inputs.json")]
-    inputs: String,
+    #[clap(short = "i", long = "inputs")]
+    inputs: Option<String>,
 }
 
 /// A subcommand for verifying a SNARK proof
 #[derive(Clap)]
 struct VerifyOpts {
+    /// Circuit for verifying (transfer|tree_update)
+    #[clap(short = "c", long = "circuit", default_value = "transfer")]
+    circuit: String,
     /// Snark verification key
-    #[clap(short = "v", long = "vk", default_value = "verification_key.json")]
-    vk: String,
+    #[clap(short = "v", long = "vk")]
+    vk: Option<String>,
     /// Proof JSON file
-    #[clap(short = "r", long = "proof", default_value = "proof.json")]
-    proof: String,
+    #[clap(short = "r", long = "proof")]
+    proof: Option<String>,
     /// Public inputs JSON file
-    #[clap(short = "i", long = "inputs", default_value = "inputs.json")]
-    inputs: String,
+    #[clap(short = "i", long = "inputs")]
+    inputs: Option<String>,
 }
 
 /// A subcommand for generating a trusted setup parameters
 #[derive(Clap)]
 struct SetupOpts {
-    /// Circuit for parameter generation
-    #[clap(short = "c", long = "circuit", default_value = "c_transfer")]
+    /// Circuit for parameter generation (transfer|tree_update)
+    #[clap(short = "c", long = "circuit", default_value = "transfer")]
     circuit: String,
     /// Snark trusted setup parameters file
-    #[clap(short = "p", long = "params", default_value = "params.bin")]
-    params: String,
+    #[clap(short = "p", long = "params")]
+    params: Option<String>,
     /// Snark verifying key file
-    #[clap(short = "v", long = "vk", default_value = "verification_key.json")]
-    vk: String,
+    #[clap(short = "v", long = "vk")]
+    vk: Option<String>,
 }
 
 /// A subcommand for generating a Solidity verifier smart contract
 #[derive(Clap)]
 struct GenerateVerifierOpts {
+    /// Circuit for verifying (transfer|tree_update)
+    #[clap(short = "c", long = "circuit", default_value = "transfer")]
+    circuit: String,
     /// Snark verification key
-    #[clap(short = "v", long = "vk", default_value = "verification_key.json")]
-    vk: String,
+    #[clap(short = "v", long = "vk")]
+    vk: Option<String>,
     /// Smart contract name
-    #[clap(short = "n", long = "name", default_value = "Verifier")]
-    contract_name: String,
+    #[clap(short = "n", long = "name")]
+    contract_name: Option<String>,
     /// Output file name
-    #[clap(short = "s", long = "solidity", default_value = "verifier.sol")]
-    solidity: String,
+    #[clap(short = "s", long = "solidity")]
+    solidity: Option<String>,
 }
 
 #[derive(Clap)]
 struct GenerateTestDataOpts {
+    /// Circuit for testing (transfer|tree_update)
+    #[clap(short = "c", long = "circuit", default_value = "transfer")]
+    circuit: String,
     /// Input object JSON file
-    #[clap(short = "o", long = "object", default_value = "object.json")]
-    object: String
+    #[clap(short = "o", long = "object")]
+    object: Option<String>
 }
 
 fn tree_circuit<C:CS<Fr=Fr>>(public: CTreePub<C>, secret: CTreeSec<C>) {
@@ -116,32 +126,54 @@ fn tx_circuit<C:CS<Fr=Fr>>(public: CTransferPub<C>, secret: CTransferSec<C>) {
 }
 
 fn cli_setup(o:SetupOpts) {
-    let params = if o.circuit.eq("tree_update") {
-        setup::<Bn256, _, _, _>(tree_circuit)
-    } else {
-        setup::<Bn256, _, _, _>(tx_circuit)
+    let params_path = o.params.unwrap_or(format!("{}_params.bin", o.circuit));
+    let vk_path = o.vk.unwrap_or(format!("{}_verification_key.json", o.circuit));
+    
+
+    let params = match o.circuit.as_str() {
+        "tree_update" => setup::<Bn256, _, _, _>(tree_circuit),
+        "transfer" => setup::<Bn256, _, _, _>(tx_circuit),
+        _ => panic!("Wrong cicruit parameter")
     };
+
     let vk = params.get_vk();
     let vk_str = serde_json::to_string_pretty(&vk).unwrap();
 
-    let mut fp = File::create(o.params).unwrap();
+    let mut fp = File::create(params_path).unwrap();
     params.write(&mut fp).unwrap();
-    std::fs::write(o.vk, &vk_str.into_bytes()).unwrap();
+    std::fs::write(vk_path, &vk_str.into_bytes()).unwrap();
     println!("setup OK");
 }
 
 fn cli_generate_verifier(o: GenerateVerifierOpts) {
-    let vk_str = std::fs::read_to_string(o.vk).unwrap();
+    let circuit = o.circuit.clone();
+    let vk_path = o.vk.unwrap_or(format!("{}_verification_key.json", circuit));
+    let contract_name = o.contract_name.unwrap_or_else(|| {
+        let s = format!("{}Verifier", circuit);
+        let mut c = s.chars();
+        match c.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().chain(c).collect(),
+        }
+    });
+    let solidity_path = o.solidity.unwrap_or(format!("{}_verifier.sol", circuit));
+
+
+    let vk_str = std::fs::read_to_string(vk_path).unwrap();
     let vk :VK<Bn256> = serde_json::from_str(&vk_str).unwrap();
-    let sol_str = generate_sol_data(&vk, o.contract_name);
-    File::create(o.solidity).unwrap().write(&sol_str.into_bytes()).unwrap();
+    let sol_str = generate_sol_data(&vk, contract_name);
+    File::create(solidity_path).unwrap().write(&sol_str.into_bytes()).unwrap();
     println!("solidity verifier generated")
 }
 
 fn cli_verify(o:VerifyOpts) {
-    let vk_str = std::fs::read_to_string(o.vk).unwrap();
-    let proof_str = std::fs::read_to_string(o.proof).unwrap();
-    let public_inputs_str = std::fs::read_to_string(o.inputs).unwrap();
+    let proof_path = o.proof.unwrap_or(format!("{}_proof.json", o.circuit));
+    let vk_path = o.vk.unwrap_or(format!("{}_verification_key.json", o.circuit));
+    let inputs_path = o.inputs.unwrap_or(format!("{}_inputs.json", o.circuit));
+
+    let vk_str = std::fs::read_to_string(vk_path).unwrap();
+    let proof_str = std::fs::read_to_string(proof_path).unwrap();
+    let public_inputs_str = std::fs::read_to_string(inputs_path).unwrap();
 
     let vk:VK<Bn256> = serde_json::from_str(&vk_str).unwrap();
     let proof:Proof<Bn256> = serde_json::from_str(&proof_str).unwrap();
@@ -151,21 +183,35 @@ fn cli_verify(o:VerifyOpts) {
 }
 
 fn cli_generate_test_data(o:GenerateTestDataOpts) {
-    let mut rng = OsRng::default();
-    let state = State::random_sample_state(&mut rng, &*POOL_PARAMS);
-    let data = state.random_sample_transfer(&mut rng, &*POOL_PARAMS);
-    let data_str = serde_json::to_string_pretty(&data).unwrap();
-    std::fs::write(o.object, &data_str.into_bytes()).unwrap();
+    let object_path = o.object.unwrap_or(format!("{}_object.json", o.circuit));
+
+    match o.circuit.as_str() {
+        "transfer" => {
+            let mut rng = OsRng::default();
+            let state = State::random_sample_state(&mut rng, &*POOL_PARAMS);
+            let data = state.random_sample_transfer(&mut rng, &*POOL_PARAMS);
+            let data_str = serde_json::to_string_pretty(&data).unwrap();
+            std::fs::write(object_path, &data_str.into_bytes()).unwrap();
+        },
+        "tree_update" => std::unimplemented!(),
+        _ => panic!("Wrong cicruit parameter")
+    }
+
     println!("Test data generated")
 
 }
 
 fn cli_prove(o:ProveOpts) {
-    let params_data = std::fs::read(o.params).unwrap();
+    let params_path = o.params.unwrap_or(format!("{}_params.bin", o.circuit));
+    let object_path = o.object.unwrap_or(format!("{}_object.json", o.circuit));
+    let proof_path = o.proof.unwrap_or(format!("{}_proof.json", o.circuit));
+    let inputs_path = o.inputs.unwrap_or(format!("{}_inputs.json", o.circuit));
+
+    let params_data = std::fs::read(params_path).unwrap();
     let mut params_data_cur = &params_data[..];
 
     let params = Parameters::<Bn256>::read(&mut params_data_cur, false, false).unwrap();
-    let object_str = std::fs::read_to_string(o.object).unwrap();
+    let object_str = std::fs::read_to_string(object_path).unwrap();
 
     let (inputs, snark_proof) = if o.circuit.eq("tree_update") {
         let (public, secret) = serde_json::from_str(&object_str).unwrap();
@@ -179,8 +225,8 @@ fn cli_prove(o:ProveOpts) {
     let proof_str = serde_json::to_string_pretty(&snark_proof).unwrap();
     let inputs_str = serde_json::to_string_pretty(&inputs).unwrap();
 
-    std::fs::write(o.proof, &proof_str.into_bytes()).unwrap();
-    std::fs::write(o.inputs, &inputs_str.into_bytes()).unwrap();
+    std::fs::write(proof_path, &proof_str.into_bytes()).unwrap();
+    std::fs::write(inputs_path, &inputs_str.into_bytes()).unwrap();
     
     println!("Proved")
 }

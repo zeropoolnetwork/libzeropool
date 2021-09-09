@@ -2,7 +2,7 @@ use fawkes_crypto::backend::bellman_groth16::{verifier::VK, group::{G1Point, G2P
 use fawkes_crypto::backend::bellman_groth16::engines::Bn256;
 
 
-pub fn generate_sol_data(vk:&VK<Bn256>) -> String {
+pub fn generate_sol_data(vk:&VK<Bn256>, name: String) -> String {
     let tpl = String::from(include_str!("../../res/verifier_groth16.sol.tpl"));
     fn stringify_g1(p:&G1Point<Bn256>) -> String {
         format!("{}, {}", p.0.to_string(), p.1.to_string()).to_string()
@@ -19,6 +19,8 @@ pub fn generate_sol_data(vk:&VK<Bn256>) -> String {
 
     tpl = tpl.replace("<%vk_ic_length%>", &vk.ic.len().to_string());
     tpl = tpl.replace("<%vk_input_length%>", &(vk.ic.len() - 1).to_string());
+
+    tpl = tpl.replace("<%name%>", &name);
 
     let mut vi = String::from("");
     for i in 0..vk.ic.len() {

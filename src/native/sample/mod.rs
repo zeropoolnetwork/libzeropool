@@ -13,8 +13,8 @@ impl<Fr:PrimeField> fawkes_crypto::rand::distributions::Distribution<Account<Fr>
     #[inline]
     fn sample<R: fawkes_crypto::rand::Rng + ?Sized>(&self, rng: &mut R) -> Account<Fr> {
         let n_bits = (<Fr as PrimeFieldParams>::Inner::NUM_WORDS*<Fr as PrimeFieldParams>::Inner::WORD_BITS) as u32;
-        let b_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::BALANCE_SIZE as u32/2);
-        let e_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::ENERGY_SIZE as u32/2);
+        let b_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::BALANCE_SIZE_BITS as u32/2);
+        let e_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::ENERGY_SIZE_BITS as u32/2);
 
         let b = BoundedNum::new(Num::from_uint(b_num).unwrap());
         let e = BoundedNum::new(Num::from_uint(e_num).unwrap());
@@ -46,9 +46,9 @@ impl<Fr:PrimeField> Note<Fr> {
     #[inline]
     pub fn sample<R: fawkes_crypto::rand::Rng + ?Sized, P:PoolParams<Fr=Fr>>(rng: &mut R, params:&P) -> Note<Fr> {
         let n_bits = (<Fr as PrimeFieldParams>::Inner::NUM_WORDS*<Fr as PrimeFieldParams>::Inner::WORD_BITS) as u32;
-        let b_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>()>>(n_bits - constants::BALANCE_SIZE as u32/2);
+        let b_num = rng.gen::<NumRepr<<Fr as PrimeFieldParams>::Inner>>() >> (n_bits - constants::BALANCE_SIZE_BITS as u32/2);
         let b = BoundedNum::new(Num::from_uint(b_num).unwrap());
-        let d:BoundedNum<_, {constants::DIVERSIFIER_SIZE}> = rng.gen();
+        let d:BoundedNum<_, {constants::DIVERSIFIER_SIZE_BITS}> = rng.gen();
         let p_d = derive_key_p_d::<P, Fr>(d.to_num(), rng.gen(), params).x;
 
         Note {

@@ -10,9 +10,9 @@ use std::fmt::Debug;
 pub struct Account<Fr:PrimeField> {
     pub eta: Num<Fr>,
     pub i: BoundedNum<Fr, { constants::HEIGHT }>,
-    pub b: BoundedNum<Fr, { constants::BALANCE_SIZE }>,
-    pub e: BoundedNum<Fr, { constants::ENERGY_SIZE }>,
-    pub t: BoundedNum<Fr, { constants::SALT_SIZE }>,
+    pub b: BoundedNum<Fr, { constants::BALANCE_SIZE_BITS }>,
+    pub e: BoundedNum<Fr, { constants::ENERGY_SIZE_BITS }>,
+    pub t: BoundedNum<Fr, { constants::SALT_SIZE_BITS }>,
 }
 
 impl<Fr:PrimeField> Account<Fr> {

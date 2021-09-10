@@ -121,8 +121,8 @@ fn buf_take<'a>(memo: &mut &'a[u8], size:usize) -> Option<&'a[u8]> {
 
 pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Option<(Account<P::Fr>, Vec<Note<P::Fr>>)> {
     let fr_size = <P::Fr as PrimeFieldParams>::Inner::NUM_WORDS * <P::Fr as PrimeFieldParams>::Inner::WORD_BITS / 8;
-    let account_size = fr_size +  (constants::HEIGHT + constants::BALANCE_SIZE + constants::ENERGY_SIZE + constants::SALT_SIZE)/8;
-    let note_size = fr_size + (constants::DIVERSIFIER_SIZE + constants::BALANCE_SIZE+constants::SALT_SIZE)/8;
+    let account_size = fr_size +  (constants::HEIGHT + constants::BALANCE_SIZE_BITS + constants::ENERGY_SIZE_BITS + constants::SALT_SIZE_BITS)/8;
+    let note_size = fr_size + (constants::DIVERSIFIER_SIZE_BITS + constants::BALANCE_SIZE_BITS+constants::SALT_SIZE_BITS)/8;
     let u256_size = 32;
 
     let nozero_items_num = u32::deserialize(&mut memo).ok()? as usize;
@@ -173,8 +173,8 @@ pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Op
 
 fn _decrypt_in<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Option<Vec<Option<Note<P::Fr>>>> {
     let fr_size = <P::Fr as PrimeFieldParams>::Inner::NUM_WORDS * <P::Fr as PrimeFieldParams>::Inner::WORD_BITS / 8;
-    let account_size = fr_size +  (constants::HEIGHT + constants::BALANCE_SIZE + constants::ENERGY_SIZE + constants::SALT_SIZE)/8;
-    let note_size = fr_size + (constants::DIVERSIFIER_SIZE + constants::BALANCE_SIZE+constants::SALT_SIZE)/8;
+    let account_size = fr_size +  (constants::HEIGHT + constants::BALANCE_SIZE_BITS + constants::ENERGY_SIZE_BITS + constants::SALT_SIZE_BITS)/8;
+    let note_size = fr_size + (constants::DIVERSIFIER_SIZE_BITS + constants::BALANCE_SIZE_BITS+constants::SALT_SIZE_BITS)/8;
     let u256_size = 32;
 
     let nozero_items_num = u32::deserialize(&mut memo).ok()? as usize;

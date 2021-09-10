@@ -12,10 +12,10 @@ use crate::constants;
 #[derive(Clone, Signal)]
 #[Value = "Note<C::Fr>"]
 pub struct CNote<C:CS> {
-    pub d: CBoundedNum<C, { constants::DIVERSIFIER_SIZE }>,
+    pub d: CBoundedNum<C, { constants::DIVERSIFIER_SIZE_BITS }>,
     pub p_d: CNum<C>,
-    pub b: CBoundedNum<C, { constants::BALANCE_SIZE }>,
-    pub t: CBoundedNum<C, { constants::SALT_SIZE }>,
+    pub b: CBoundedNum<C, { constants::BALANCE_SIZE_BITS }>,
+    pub t: CBoundedNum<C, { constants::SALT_SIZE_BITS }>,
 }
 
 

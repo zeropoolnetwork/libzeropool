@@ -1,17 +1,17 @@
-use fawkes_crypto::circuit::{
+use fawkes_crypto::{circuit::{
     bitify::{c_into_bits_le, c_into_bits_le_strict, c_comp, c_from_bits_le},
     bool::CBool,
     eddsaposeidon::c_eddsaposeidon_verify,
     num::CNum,
     poseidon::{c_poseidon_merkle_proof_root, c_poseidon, c_poseidon_merkle_tree_root, c_poseidon_sponge, CMerkleProof},
     cs::{RCS, CS}
-};
+}, ff_uint::PrimeFieldParams};
 use fawkes_crypto::core::{signal::Signal, sizedvec::SizedVec,};
 use fawkes_crypto::ff_uint::{Num, NumRepr};
-use crate::circuit::{account::CAccount, note::CNote, key::{c_derive_key_eta, c_derive_key_p_d}};
+use crate::{circuit::{account::CAccount, note::CNote, key::{c_derive_key_eta, c_derive_key_p_d}}};
 use crate::native::tx::{TransferPub, TransferSec, Tx};
 use crate::native::params::PoolParams;
-use crate::constants::{HEIGHT, IN, OUT, BALANCE_SIZE, ENERGY_SIZE};
+use crate::constants::{HEIGHT, IN, OUT, BALANCE_SIZE_BITS, ENERGY_SIZE_BITS};
 
 
 #[derive(Clone, Signal)]
@@ -20,7 +20,7 @@ pub struct CTransferPub<C:CS> {
     pub root: CNum<C>,
     pub nullifier: CNum<C>,
     pub out_commit: CNum<C>,
-    pub delta: CNum<C>, // int64 token delta, int96 energy delta, uint32 blocknumber
+    pub delta: CNum<C>, // int64 token delta, int64 energy delta, uint32 blocknumber
     pub memo: CNum<C>,
 }
 
@@ -78,8 +78,8 @@ pub fn c_out_commitment_hash<C:CS, P:PoolParams<Fr=C::Fr>>(items:&[CNum<C>], par
 }
 
 pub fn c_parse_delta<C:CS, P:PoolParams<Fr=C::Fr>>(delta: &CNum<C>) -> (CNum<C>, CNum<C>, CNum<C>) {
-    let cv = BALANCE_SIZE;
-    let ce = ENERGY_SIZE;
+    let cv = BALANCE_SIZE_BITS;
+    let ce = ENERGY_SIZE_BITS;
     let ch = HEIGHT;
     let delta_bits = c_into_bits_le(delta, cv+ce+ch);
 
@@ -162,6 +162,9 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
     //build merkle proofs
     {
+        //assuming input_pos_index <= current_index
+        let ref input_pos_index = c_from_bits_le(s.in_proof.0.path.as_slice());
+
         let cur_root = c_poseidon_merkle_proof_root(&in_account_hash, &s.in_proof.0, params.compress());
         //assert root == cur_root || account.is_dummy()
         ((cur_root - &p.root) * s.tx.input.0.is_dummy_raw()).assert_zero();
@@ -176,7 +179,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         (s.tx.input.0.t.as_num()-s.tx.output.0.t.as_num()).assert_nonzero();
 
         //compute enegry
-        total_enegry += s.tx.input.0.b.as_num() * (output_index- input_index);
+        total_enegry += s.tx.input.0.b.as_num() * (&current_index - input_pos_index);
     }
 
 
@@ -195,7 +198,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         (note_index_ok | note_dummy).assert_const(&true);
 
         //compute enegry
-        total_enegry += note_value * (output_index - note_index);
+        total_enegry += note_value * (&current_index - note_index);
     }
 
     //bind msg_hash to the circuit
@@ -223,7 +226,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
     //final check energy
     total_enegry += s.tx.input.0.e.as_num();
     total_enegry -= s.tx.output.0.e.as_num();
-    total_enegry.assert_zero();
 
+    //assuming no overflow when sum total_enegry
+    c_into_bits_le(&total_enegry, <C::Fr as PrimeFieldParams>::MODULUS_BITS as usize - 2);
 }
 

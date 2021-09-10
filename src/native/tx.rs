@@ -13,7 +13,7 @@ use crate::{
         note::Note,
         account::Account
     },
-    constants::{IN, OUT, BALANCE_SIZE, ENERGY_SIZE, HEIGHT}
+    constants::{IN, OUT, BALANCE_SIZE_BITS, ENERGY_SIZE_BITS, HEIGHT}
 };
 
 
@@ -109,7 +109,7 @@ pub fn out_commitment_hash<P:PoolParams>(items:&[Num<P::Fr>], params: &P) -> Num
 pub fn parse_delta<Fr:PrimeField>(delta: Num<Fr>) -> (Num<Fr>, Num<Fr>, Num<Fr>) {
     let mut delta_num = delta.to_uint();
 
-    let v_limit = NumRepr::ONE << BALANCE_SIZE as u32;
+    let v_limit = NumRepr::ONE << BALANCE_SIZE_BITS as u32;
     let v_num = delta_num & (v_limit - NumRepr::ONE);
     let v = if v_num < v_limit >> 1 {
         Num::from_uint(v_num).unwrap()
@@ -117,9 +117,9 @@ pub fn parse_delta<Fr:PrimeField>(delta: Num<Fr>) -> (Num<Fr>, Num<Fr>, Num<Fr>)
         Num::from_uint(v_num).unwrap() - Num::from_uint(v_limit).unwrap()
     };
 
-    delta_num >>= BALANCE_SIZE as u32;
+    delta_num >>= BALANCE_SIZE_BITS as u32;
 
-    let e_limit = NumRepr::ONE << ENERGY_SIZE as u32;
+    let e_limit = NumRepr::ONE << ENERGY_SIZE_BITS as u32;
     let e_num = delta_num & (e_limit - NumRepr::ONE);
     let e = if e_num < e_limit >> 1 {
         Num::from_uint(e_num).unwrap()
@@ -127,7 +127,7 @@ pub fn parse_delta<Fr:PrimeField>(delta: Num<Fr>) -> (Num<Fr>, Num<Fr>, Num<Fr>)
         Num::from_uint(e_num).unwrap() - Num::from_uint(e_limit).unwrap()
     };
 
-    delta_num >>= ENERGY_SIZE as u32;
+    delta_num >>= ENERGY_SIZE_BITS as u32;
 
     let h_limit = NumRepr::ONE << HEIGHT as u32;
 
@@ -140,8 +140,8 @@ pub fn parse_delta<Fr:PrimeField>(delta: Num<Fr>) -> (Num<Fr>, Num<Fr>, Num<Fr>)
 
 
 pub fn make_delta<Fr:PrimeField>(v:Num<Fr>, e:Num<Fr>, index:Num<Fr>) -> Num<Fr> {
-    let v_limit = NumRepr::ONE << BALANCE_SIZE as u32;
-    let e_limit = NumRepr::ONE << ENERGY_SIZE as u32;
+    let v_limit = NumRepr::ONE << BALANCE_SIZE_BITS as u32;
+    let e_limit = NumRepr::ONE << ENERGY_SIZE_BITS as u32;
     
     let v_num = v.to_uint();
     let e_num = e.to_uint();

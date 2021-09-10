@@ -7,10 +7,10 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct Note<Fr:PrimeField> {
-    pub d: BoundedNum<Fr, { constants::DIVERSIFIER_SIZE }>,
+    pub d: BoundedNum<Fr, { constants::DIVERSIFIER_SIZE_BITS }>,
     pub p_d: Num<Fr>,
-    pub b: BoundedNum<Fr, { constants::BALANCE_SIZE }>,
-    pub t: BoundedNum<Fr, { constants::SALT_SIZE }>,
+    pub b: BoundedNum<Fr, { constants::BALANCE_SIZE_BITS }>,
+    pub t: BoundedNum<Fr, { constants::SALT_SIZE_BITS }>,
 }
 
 impl<Fr:PrimeField> Note<Fr> {

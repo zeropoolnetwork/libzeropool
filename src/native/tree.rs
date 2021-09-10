@@ -4,7 +4,7 @@ use crate::{
         ff_uint::{Num, PrimeField},
         borsh::{self, BorshSerialize, BorshDeserialize},
     },
-    constants::{HEIGHT, OUTLOG}
+    constants::{HEIGHT, OUTPLUSONELOG}
 };
 
 
@@ -22,7 +22,7 @@ pub struct TreePub<Fr:PrimeField> {
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct TreeSec<Fr:PrimeField> {
-    pub proof_filled:MerkleProof<Fr, {HEIGHT - OUTLOG}>,
-    pub proof_free:MerkleProof<Fr, {HEIGHT - OUTLOG}>,
+    pub proof_filled:MerkleProof<Fr, {HEIGHT - OUTPLUSONELOG}>,
+    pub proof_free:MerkleProof<Fr, {HEIGHT - OUTPLUSONELOG}>,
     pub prev_leaf:Num<Fr>
 }

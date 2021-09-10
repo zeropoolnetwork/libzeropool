@@ -9,9 +9,9 @@ use crate::constants;
 pub struct CAccount<C:CS> {
     pub eta: CNum<C>,
     pub i: CBoundedNum<C, { constants::HEIGHT }>,
-    pub b: CBoundedNum<C, { constants::BALANCE_SIZE }>,
-    pub e: CBoundedNum<C, { constants::ENERGY_SIZE }>,
-    pub t: CBoundedNum<C, { constants::SALT_SIZE }>,
+    pub b: CBoundedNum<C, { constants::BALANCE_SIZE_BITS }>,
+    pub e: CBoundedNum<C, { constants::ENERGY_SIZE_BITS }>,
+    pub t: CBoundedNum<C, { constants::SALT_SIZE_BITS }>,
 }
 
 

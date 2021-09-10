@@ -114,7 +114,7 @@ impl<P:PoolParams> State<P> {
         }
 
         let mut input_energy = self.items[self.account_id].0.e.to_num();
-        input_energy += self.items[self.account_id].0.b.to_num()*(Num::from(index as u32) - self.items[self.account_id].0.i.to_num()) ;
+        input_energy += self.items[self.account_id].0.b.to_num()*(Num::from((index-self.account_id*2) as u32)) ;
 
 
         for &i in self.note_id.iter() {

@@ -9,7 +9,7 @@ use fawkes_crypto::core::signal::Signal;
 use fawkes_crypto::ff_uint::Num;
 use crate::native::tree::{TreePub, TreeSec};
 use crate::native::params::PoolParams;
-use crate::constants::{HEIGHT, OUTLOG};
+use crate::constants::{HEIGHT, OUTPLUSONELOG};
 
 
 
@@ -25,8 +25,8 @@ pub struct CTreePub<C:CS> {
 #[derive(Clone, Signal)]
 #[Value = "TreeSec<C::Fr>"]
 pub struct CTreeSec<C:CS> {
-    pub proof_filled:CMerkleProof<C, {HEIGHT - OUTLOG}>,
-    pub proof_free:CMerkleProof<C, {HEIGHT - OUTLOG}>,
+    pub proof_filled:CMerkleProof<C, {HEIGHT - OUTPLUSONELOG}>,
+    pub proof_free:CMerkleProof<C, {HEIGHT - OUTPLUSONELOG}>,
     pub prev_leaf:CNum<C>
 }
 
@@ -39,7 +39,7 @@ pub fn tree_update<C:CS, P:PoolParams<Fr=C::Fr>>(
     let index_free = c_from_bits_le(s.proof_free.path.as_slice());
 
     let mut zero_leaf_value = Num::ZERO;
-    for _ in 0..OUTLOG {
+    for _ in 0..OUTPLUSONELOG {
         zero_leaf_value = poseidon(&[zero_leaf_value, zero_leaf_value], params.compress());
     }
 

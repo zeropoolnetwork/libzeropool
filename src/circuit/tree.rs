@@ -61,7 +61,8 @@ pub fn tree_update<C:CS, P:PoolParams<Fr=C::Fr>>(
     let prev_leaf_expr = !(&s.prev_leaf-zero_leaf_value).is_zero();
     
     //for non-empty tree previous proof should be valid for nonzero leaf
-    ((prev_proof_expr & prev_index_expr & prev_leaf_expr) | empty_tree).assert_const(&true);
+    ((prev_proof_expr & prev_index_expr & prev_leaf_expr) | &empty_tree).assert_const(&true);
 
-
+    //for empty tree index_free should be zero
+    (index_free.is_zero() | (!&empty_tree)).assert_const(&true);
 }

@@ -145,6 +145,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
 
     //build decryption key
+    //address is derived from decryption key
+    //also decryption key is using for decrypting the data of notes
     let eta = c_derive_key_eta(&s.eddsa_a, params);
     let eta_bits = c_into_bits_le_strict(&eta);
 

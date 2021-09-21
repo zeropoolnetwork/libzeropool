@@ -27,18 +27,18 @@ fn keccak256(data:&[u8])->[u8;32] {
     res
 }
 
+//key stricly assumed to be unique for all messages. Using this function with multiple messages and one key is insecure!
 fn symcipher_encode(key:&[u8], data:&[u8])->Vec<u8> {
     assert!(key.len()==32);
-    let hash = keccak256(key);
-    let nonce = Nonce::from_slice(&hash[0..12]);
+    let nonce = Nonce::from_slice(&constants::ENCRYPTION_NONCE);
     let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
     cipher.encrypt(nonce, data.as_ref()).unwrap()
 }
 
+//key stricly assumed to be unique for all messages. Using this function with multiple messages and one key is insecure!
 fn symcipher_decode(key:&[u8], data:&[u8])->Option<Vec<u8>> {
     assert!(key.len()==32);
-    let hash = keccak256(key);
-    let nonce = Nonce::from_slice(&hash[0..12]);
+    let nonce = Nonce::from_slice(&constants::ENCRYPTION_NONCE);
     let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
     cipher.decrypt(nonce, data).ok()
 

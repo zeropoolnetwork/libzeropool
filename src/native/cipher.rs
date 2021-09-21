@@ -62,8 +62,8 @@ pub fn encrypt<P: PoolParams>(
     let account_data = {
         let mut account_key = [0u8;32];
         sb.fill_bytes(&mut account_key);
-        let acccount_ciphertext = symcipher_encode(&account_key, &account.try_to_vec().unwrap());
-        (account_key, acccount_ciphertext)
+        let account_ciphertext = symcipher_encode(&account_key, &account.try_to_vec().unwrap());
+        (account_key, account_ciphertext)
     };
     
     

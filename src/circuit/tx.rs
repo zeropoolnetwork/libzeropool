@@ -169,6 +169,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
         let cur_root = c_poseidon_merkle_proof_root(&in_account_hash, &s.in_proof.0, params.compress());
         //assert root == cur_root || account.is_dummy()
+        //all uninitialized empty accounts considered to be in the privacy set
         ((cur_root - &p.root) * s.tx.input.0.is_dummy_raw()).assert_zero();
 
         //input_index <= output_index

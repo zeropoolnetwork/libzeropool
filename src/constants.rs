@@ -5,7 +5,7 @@ pub const OUT: usize = (1<<OUTPLUSONELOG)-1;
 pub const HEIGHT: usize = 48;
 pub const DIVERSIFIER_SIZE_BITS: usize = 80;
 pub const BALANCE_SIZE_BITS: usize = 64;
-pub const ENERGY_SIZE_BITS: usize = 64;
+pub const ENERGY_SIZE_BITS: usize = BALANCE_SIZE_BITS+HEIGHT;
 pub const SALT_SIZE_BITS: usize = 80;
 
 

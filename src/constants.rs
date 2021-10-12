@@ -7,7 +7,7 @@ pub const DIVERSIFIER_SIZE_BITS: usize = 80;
 pub const BALANCE_SIZE_BITS: usize = 64;
 pub const ENERGY_SIZE_BITS: usize = BALANCE_SIZE_BITS+HEIGHT;
 pub const SALT_SIZE_BITS: usize = 80;
-
+pub const POOLID_SIZE_BITS: usize = 24;
 
 pub const POLY_1305_TAG_SIZE: usize = 16;
 pub const NUM_SIZE: usize = 32;

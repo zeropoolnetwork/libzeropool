@@ -11,7 +11,7 @@ use fawkes_crypto::ff_uint::{Num, NumRepr};
 use crate::{circuit::{account::CAccount, note::CNote, key::{c_derive_key_eta, c_derive_key_p_d}}};
 use crate::native::tx::{TransferPub, TransferSec, Tx};
 use crate::native::params::PoolParams;
-use crate::constants::{HEIGHT, IN, OUT, BALANCE_SIZE_BITS, ENERGY_SIZE_BITS};
+use crate::constants::{HEIGHT, IN, OUT, BALANCE_SIZE_BITS, ENERGY_SIZE_BITS, POOLID_SIZE_BITS};
 
 
 #[derive(Clone, Signal)]
@@ -77,17 +77,28 @@ pub fn c_out_commitment_hash<C:CS, P:PoolParams<Fr=C::Fr>>(items:&[CNum<C>], par
     c_poseidon_merkle_tree_root(items, params.compress())
 }
 
-pub fn c_parse_delta<C:CS, P:PoolParams<Fr=C::Fr>>(delta: &CNum<C>) -> (CNum<C>, CNum<C>, CNum<C>) {
-    let cv = BALANCE_SIZE_BITS;
-    let ce = ENERGY_SIZE_BITS;
-    let ch = HEIGHT;
-    let delta_bits = c_into_bits_le(delta, cv+ce+ch);
+pub fn c_parse_delta<C:CS, P:PoolParams<Fr=C::Fr>>(delta: &CNum<C>) -> (CNum<C>, CNum<C>, CNum<C>, CNum<C>) {
+    fn c_parse_uint<C:CS>(bits: &mut &[CBool<C>], len:usize) -> CNum<C> {
+        let res = c_from_bits_le(&bits[0..len]);
+        *bits = &bits[len..];
+        res
+    }
 
-    let v = c_from_bits_le(&delta_bits[0..cv]) - &delta_bits[cv-1].to_num() * Num::from_uint(NumRepr::ONE << cv as u32).unwrap();
-    let e = c_from_bits_le(&delta_bits[cv..cv+ce]) - &delta_bits[cv+ce-1].to_num() * Num::from_uint(NumRepr::ONE << ce as u32).unwrap();
-    let index = c_from_bits_le(&delta_bits[cv+ce..cv+ce+ch]);
+    fn c_parse_int<C:CS>(bits: &mut &[CBool<C>], len:usize) -> CNum<C> {
+        let two_component_term = - bits[len-1].as_num() * Num::from_uint(NumRepr::ONE << len as u32).unwrap();
+        two_component_term + c_parse_uint(bits, len)
+    }
 
-    (v, e, index)
+    let delta_bits_vec = c_into_bits_le(delta, BALANCE_SIZE_BITS+ENERGY_SIZE_BITS+HEIGHT+POOLID_SIZE_BITS);
+    let mut delta_bits = delta_bits_vec.as_slice();
+
+    (
+        c_parse_int(&mut delta_bits, BALANCE_SIZE_BITS),
+        c_parse_int(&mut delta_bits, ENERGY_SIZE_BITS),
+        c_parse_uint(&mut delta_bits, HEIGHT),
+        c_parse_uint(&mut delta_bits, POOLID_SIZE_BITS),
+    )
+
 }
 
 
@@ -98,7 +109,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
     params: &P,
 ) {
     //parse delta
-    let (delta_value, delta_energy, current_index) = c_parse_delta::<C,P>(&p.delta);
+    let (delta_value, delta_energy, current_index, poolid) = c_parse_delta::<C,P>(&p.delta);
     let mut total_value = delta_value;
     let mut total_enegry = delta_energy;
 
@@ -170,7 +181,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         let cur_root = c_poseidon_merkle_proof_root(&in_account_hash, &s.in_proof.0, params.compress());
         //assert root == cur_root || account.is_dummy()
         //all uninitialized empty accounts considered to be in the privacy set
-        ((cur_root - &p.root) * s.tx.input.0.is_dummy_raw()).assert_zero();
+        (cur_root.is_eq(&p.root) | s.tx.input.0.is_initial(&poolid)).assert_const(&true);
 
         //input_index <= output_index
         c_comp(input_index, output_index, HEIGHT).assert_const(&false);

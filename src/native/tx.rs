@@ -1,20 +1,16 @@
-use crate::{
-    fawkes_crypto::{
+use crate::{constants::{BALANCE_SIZE_BITS, ENERGY_SIZE_BITS, HEIGHT, IN, OUT, POOLID_SIZE_BITS}, fawkes_crypto::{
         native::{
             eddsaposeidon::{eddsaposeidon_sign, eddsaposeidon_verify},
             poseidon::{poseidon, poseidon_merkle_tree_root, poseidon_sponge, MerkleProof},
         },
         core::sizedvec::SizedVec,
-        ff_uint::{Num, NumRepr, PrimeField},
+        ff_uint::{Num, NumRepr, PrimeField, Uint},
         borsh::{self, BorshSerialize, BorshDeserialize},
-    },
-    native::{
+    }, native::{
         params::PoolParams,
         note::Note,
         account::Account
-    },
-    constants::{IN, OUT, BALANCE_SIZE_BITS, ENERGY_SIZE_BITS, HEIGHT}
-};
+    }};
 
 
 use std::fmt::Debug;
@@ -106,66 +102,67 @@ pub fn out_commitment_hash<P:PoolParams>(items:&[Num<P::Fr>], params: &P) -> Num
 
 
 
-pub fn parse_delta<Fr:PrimeField>(delta: Num<Fr>) -> (Num<Fr>, Num<Fr>, Num<Fr>) {
+pub fn parse_delta<Fr:PrimeField>(delta: Num<Fr>) -> (Num<Fr>, Num<Fr>, Num<Fr>, Num<Fr>) {
+    fn _parse_uint<U:Uint>(n:&mut NumRepr<U>, len:usize) -> NumRepr<U> {
+        let t = *n;
+        *n = *n >> len as u32;
+        t - (*n << len as u32)
+    }
+
+    fn parse_uint<Fr:PrimeField>(n:&mut NumRepr<Fr::Inner>, len:usize) -> Num<Fr> {
+        Num::from_uint(_parse_uint(n, len)).unwrap()
+    }
+
+    fn parse_int<Fr:PrimeField>(n:&mut NumRepr<Fr::Inner>, len:usize) -> Num<Fr> {
+        let two_component_term =  -Num::from_uint(NumRepr::ONE << len as u32).unwrap();
+        let r = _parse_uint(n, len);
+        if r >> (len as u32 - 1) == NumRepr::ZERO {
+            Num::from_uint(r).unwrap()
+        } else {
+            Num::from_uint(r).unwrap() + two_component_term
+        }
+    }
+
     let mut delta_num = delta.to_uint();
 
-    let v_limit = NumRepr::ONE << BALANCE_SIZE_BITS as u32;
-    let v_num = delta_num & (v_limit - NumRepr::ONE);
-    let v = if v_num < v_limit >> 1 {
-        Num::from_uint(v_num).unwrap()
-    } else {
-        Num::from_uint(v_num).unwrap() - Num::from_uint(v_limit).unwrap()
-    };
+    (
+        parse_int(&mut delta_num, BALANCE_SIZE_BITS),
+        parse_int(&mut delta_num, ENERGY_SIZE_BITS),
+        parse_uint(&mut delta_num, HEIGHT),
+        parse_uint(&mut delta_num, POOLID_SIZE_BITS),
 
-    delta_num >>= BALANCE_SIZE_BITS as u32;
-
-    let e_limit = NumRepr::ONE << ENERGY_SIZE_BITS as u32;
-    let e_num = delta_num & (e_limit - NumRepr::ONE);
-    let e = if e_num < e_limit >> 1 {
-        Num::from_uint(e_num).unwrap()
-    } else {
-        Num::from_uint(e_num).unwrap() - Num::from_uint(e_limit).unwrap()
-    };
-
-    delta_num >>= ENERGY_SIZE_BITS as u32;
-
-    let h_limit = NumRepr::ONE << HEIGHT as u32;
-
-    assert!(delta_num < h_limit, "wrong delta amount");
-
-    let index = Num::from_uint(delta_num).unwrap();
-
-    (v, e, index)
+    )
 }
 
 
-pub fn make_delta<Fr:PrimeField>(v:Num<Fr>, e:Num<Fr>, index:Num<Fr>) -> Num<Fr> {
-    let v_limit = NumRepr::ONE << BALANCE_SIZE_BITS as u32;
-    let e_limit = NumRepr::ONE << ENERGY_SIZE_BITS as u32;
-    
-    let v_num = v.to_uint();
-    let e_num = e.to_uint();
-
-    assert!(v_num < v_limit>>1 || Num::<Fr>::MODULUS - v_num <= v_limit>>1, "v out of range");
-    assert!(e_num < e_limit>>1 || Num::<Fr>::MODULUS - e_num <= e_limit>>1, "v out of range");
-
-    let mut res = index;
-
-    res*=Num::from_uint(e_limit).unwrap();
-
-    if e_num < e_limit >> 1 {
-        res+=e;
-    } else {
-        res+=Num::from_uint(e_limit).unwrap()+e;
+pub fn make_delta<Fr:PrimeField>(v:Num<Fr>, e:Num<Fr>, index:Num<Fr>, poolid:Num<Fr>) -> Num<Fr> {
+    fn make_uint<Fr:PrimeField>(s: &mut NumRepr<Fr::Inner>, n:Num<Fr>, len:usize) {
+        let r = n.to_uint();
+        assert!(r >> len as u32 == NumRepr::ZERO, "out of range");
+        *s = (*s << len as u32) + r;
     }
 
-    res*=Num::from_uint(v_limit).unwrap();
-
-    if v_num < v_limit >> 1 {
-        res+=v;
-    } else {
-        res+=Num::from_uint(v_limit).unwrap()+v;
+    fn make_int<Fr:PrimeField>(s: &mut NumRepr<Fr::Inner>, n:Num<Fr>, len:usize) {
+        let mut r = n.to_uint();
+        if r >> (len as u32 - 1) == NumRepr::ZERO {
+            *s = (*s << len as u32) + r;
+            return;
+        }
+        r = Num::<Fr>::MODULUS - r;
+        if (r - NumRepr::ONE) >> (len as u32 - 1) == NumRepr::ZERO {
+            r = (NumRepr::ONE << len as u32) - r;
+            *s = (*s << len as u32) + r;
+            return;
+        }
+        
+        panic!("out of range");
     }
 
-    res
+    let mut s = NumRepr::ZERO;
+    make_uint(&mut s, poolid, POOLID_SIZE_BITS);
+    make_uint(&mut s, index, HEIGHT);
+    make_int(&mut s, e, ENERGY_SIZE_BITS);
+    make_int(&mut s, v, BALANCE_SIZE_BITS);
+
+    Num::from_uint(s).unwrap()
 }

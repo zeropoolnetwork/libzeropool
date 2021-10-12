@@ -143,7 +143,7 @@ impl<P:PoolParams> State<P> {
         let (eddsa_s,eddsa_r) = tx_sign(self.sigma, tx_hash, params);
 
 
-        let delta = make_delta::<P::Fr>(Num::ZERO, Num::ZERO, Num::from(index as u32));
+        let delta = make_delta::<P::Fr>(Num::ZERO, Num::ZERO, Num::from(index as u32), Num::ZERO);
         
         let p = TransferPub::<P::Fr> {
             root,

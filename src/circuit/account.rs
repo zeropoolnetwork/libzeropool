@@ -21,8 +21,7 @@ impl<C:CS> CAccount<C> {
         c_poseidon(&inputs, params.account())
     }
 
-    // returns zero if Note is dummy or nonzero otherwise
-    pub fn is_dummy_raw(&self) -> CNum<C> {
-        self.i.as_num()+self.b.as_num()+self.e.as_num()+self.t.as_num()
+    pub fn is_initial(&self, poolid:&CNum<C>) -> CBool<C> {
+        (self.i.as_num()+self.b.as_num()+self.e.as_num()).is_zero() & self.t.as_num().is_eq(poolid)
     }
 }

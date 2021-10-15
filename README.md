@@ -1,4 +1,4 @@
-# libzeropool (WIP)
+# libzeropool
 
 This is library with circuits and cryptography of ZeroPool. 
 

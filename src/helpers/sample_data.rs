@@ -18,6 +18,58 @@ use crate::{constants,
 
 pub const N_ITEMS:usize = 1000;
 
+pub struct HashTreeState<P:PoolParams> {
+    pub hashes:Vec<Vec<Num<P::Fr>>>,
+    pub default_hashes: Vec<Num<P::Fr>>
+}
+
+impl<P:PoolParams> HashTreeState<P> {
+    pub fn new(params:&P) -> Self {
+        let default_hashes = {
+            std::iter::successors(Some(Num::ZERO), |t| 
+                Some(poseidon([*t,*t].as_ref(), params.compress()))
+            ).skip(constants::OUTPLUSONELOG).take(constants::HEIGHT - constants::OUTPLUSONELOG+1).collect()
+        };
+        
+        let hashes = (0..constants::HEIGHT - constants::OUTPLUSONELOG+1).map(|_| vec![]).collect();
+
+        Self {hashes, default_hashes}
+    }
+
+    pub fn push(&mut self, n:Num<P::Fr>, params:&P) {
+        let mut p = self.hashes[0].len();
+        self.hashes[0].push(n);
+
+        for i in 0..constants::HEIGHT - constants::OUTPLUSONELOG {
+            p >>= 1;
+            if self.hashes[i+1].len() <= p {
+                self.hashes[i+1].push(self.default_hashes[i+1]);
+            }
+            let left = self.cell(i, 2*p);
+            let right = self.cell(i, 2*p+1);
+            self.hashes[i+1][p] = poseidon([left, right].as_ref(), params.compress());
+        }
+    }
+
+    pub fn cell(&self, i:usize, j:usize) -> Num<P::Fr> {
+        if self.hashes[i].len() <= j {
+            self.default_hashes[i]
+        } else {
+            self.hashes[i][j]
+        }
+    }
+
+    pub fn merkle_proof(&self, id:usize) -> MerkleProof<P::Fr, { constants::HEIGHT - constants::OUTPLUSONELOG }> {
+        let sibling = (0..constants::HEIGHT - constants::OUTPLUSONELOG).map(|i| self.cell(i, (id>>i)^1)).collect();
+        let path =  (0..constants::HEIGHT - constants::OUTPLUSONELOG).map(|i| (id>>i)&1==1).collect();
+        MerkleProof {sibling, path}
+    }
+
+    pub fn root(&self) -> Num<P::Fr> {
+        return self.cell(constants::HEIGHT - constants::OUTPLUSONELOG, 0)
+    }
+}
+
 pub struct State<P:PoolParams> {
     pub hashes:Vec<Vec<Num<P::Fr>>>,
     pub items:Vec<(Account<P::Fr>, Note<P::Fr>)>,
@@ -193,7 +245,7 @@ impl<P:PoolParams> State<P> {
     }
 
     fn root(&self) -> Num<P::Fr> {
-        return self.hashes[constants::HEIGHT][0]
+        return self.cell(constants::HEIGHT, 0)
     }
 
 }

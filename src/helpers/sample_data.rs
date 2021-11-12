@@ -38,13 +38,13 @@ impl<P:PoolParams> State<P> {
         let note_id = rand::seq::index::sample(rng, N_ITEMS, constants::IN).into_vec();
 
 
-        let mut items:Vec<(Account<_>, Note<_>)> = (0..N_ITEMS).map(|_| (rng.gen(), Note::sample(rng, params) )).collect();
+        let mut items:Vec<(Account<_>, Note<_>)> = (0..N_ITEMS).map(|_| (Account::sample(rng, params), Note::sample(rng, params) )).collect();
 
         for i in note_id.iter().cloned() {
             items[i].1.p_d = derive_key_p_d(items[i].1.d.to_num(), eta, params).x;
         }
 
-        items[account_id].0.eta = eta;
+        items[account_id].0.p_d = derive_key_p_d(items[account_id].0.d.to_num(), eta, params).x;
         items[account_id].0.i = BoundedNum::new(Num::ZERO);
 
         let mut default_hashes = vec![Num::ZERO;constants::HEIGHT+1];
@@ -121,11 +121,11 @@ impl<P:PoolParams> State<P> {
             input_energy+=self.items[i].1.b.to_num()*Num::from((index-(2*i+1)) as u32);
         }
 
-        let mut out_account: Account<P::Fr> = rng.gen();
+        let mut out_account: Account<P::Fr> = Account::sample(rng, params);
         out_account.b = BoundedNum::new(input_value);
         out_account.e = BoundedNum::new(input_energy);
         out_account.i = BoundedNum::new(Num::from(index as u32));
-        out_account.eta = eta;
+        out_account.p_d = derive_key_p_d(out_account.d.to_num(), eta, params).x;
 
         
         let mut out_note: Note<P::Fr> = Note::sample(rng, params);

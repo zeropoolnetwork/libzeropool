@@ -46,7 +46,8 @@ pub struct TransferSec<Fr:PrimeField> {
 
 
 pub fn nullifier<P:PoolParams>(account_hash: Num<P::Fr>, eta: Num<P::Fr>, params: &P) -> Num<P::Fr> {
-    poseidon(&[account_hash, eta], params.compress())
+    let intermediate_hash = poseidon(&[account_hash, eta], params.compress());
+    poseidon(&[account_hash, intermediate_hash], params.compress())
 }
 
 pub fn note_hash<P:PoolParams>(note: Note<P::Fr>, params: &P) -> Num<P::Fr> {
@@ -57,7 +58,7 @@ pub fn note_hash<P:PoolParams>(note: Note<P::Fr>, params: &P) -> Num<P::Fr> {
 }
 
 pub fn accout_hash<P:PoolParams>(ac: Account<P::Fr>, params: &P) -> Num<P::Fr> {
-    let inputs = vec![ac.eta, ac.i.to_num(), ac.b.to_num(), ac.t.to_num()];
+    let inputs = vec![ac.d.to_num(), ac.p_d, ac.i.to_num(), ac.b.to_num()];
     poseidon(
         &inputs,
         params.note(),

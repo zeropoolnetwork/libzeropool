@@ -18,11 +18,11 @@ fn test_encryption() {
     let receiver_eta = rng.gen();
 
 
-    let mut account: Account<Fr> = rng.gen();
+    let mut account: Account<Fr> = Account::sample(&mut rng, &*POOL_PARAMS);
     let mut note:Vec<Note<Fr>> = (0..2).map(|_| Note::sample(&mut rng, &*POOL_PARAMS)).collect();
     
     
-    account.eta = sender_eta;
+    account.p_d = derive_key_p_d(account.d.as_num().clone(), sender_eta, &*POOL_PARAMS).x;
     note[0].p_d = derive_key_p_d(note[0].d.as_num().clone(), receiver_eta, &*POOL_PARAMS).x;
     
 

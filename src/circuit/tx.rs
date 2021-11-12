@@ -46,8 +46,13 @@ pub fn c_nullfifier<C:CS, P: PoolParams<Fr = C::Fr>>(
     eta: &CNum<C>,
     params: &P,
 ) -> CNum<C> {
-    c_poseidon(
+    let intermediate_hash = c_poseidon(
         [in_account_hash.clone(), eta.clone()].as_ref(),
+        params.compress(),
+    );
+
+    c_poseidon(
+        [in_account_hash.clone(), intermediate_hash].as_ref(),
         params.compress(),
     )
 }
@@ -162,8 +167,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
     let eta_bits = c_into_bits_le_strict(&eta);
 
     //check ownership
-    (&s.tx.input.0.eta - &eta).assert_zero();
-    (&s.tx.output.0.eta - &eta).assert_zero();
+    (&s.tx.input.0.p_d - c_derive_key_p_d(&s.tx.input.0.d.as_num(), &eta_bits, params).x).assert_zero();
+    (&s.tx.output.0.p_d - c_derive_key_p_d(&s.tx.output.0.d.as_num(), &eta_bits, params).x).assert_zero();
 
     for i in 0..IN {
         (&s.tx.input.1[i].p_d - c_derive_key_p_d(&s.tx.input.1[i].d.as_num(), &eta_bits, params).x).assert_zero();
@@ -190,7 +195,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         c_comp(output_index, &current_index, HEIGHT).assert_const(&false);
 
         //protect from burning the account at zero self-transfer case
-        (s.tx.input.0.t.as_num()-s.tx.output.0.t.as_num()).assert_nonzero();
+        (s.tx.input.0.d.as_num()-s.tx.output.0.d.as_num()).assert_nonzero();
 
         //compute enegry
         total_enegry += s.tx.input.0.b.as_num() * (&current_index - input_pos_index);

@@ -1,6 +1,6 @@
 use crate::{
     fawkes_crypto::{
-        ff_uint::{Num,  PrimeFieldParams, Uint, seedbox::{SeedboxBlake2, SeedBox, SeedBoxGen}},
+        ff_uint::{Num,  PrimeFieldParams, Uint, seedbox::{SeedboxChaCha20, SeedBox, SeedBoxGen}},
         borsh::{BorshSerialize, BorshDeserialize},
         native::ecc::{EdwardsPoint},
 
@@ -57,7 +57,7 @@ pub fn encrypt<P: PoolParams>(
     let nozero_items_num = nozero_notes_num+1;
     
 
-    let mut sb = SeedboxBlake2::new_with_salt(entropy);
+    let mut sb = SeedboxChaCha20::new_with_salt(entropy);
 
     let account_data = {
         let mut account_key = [0u8;32];

@@ -1,6 +1,6 @@
 [package]
 name = "libzeropool"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Igor Gulamov <igor.gulamov@gmail.com>"]
 edition = "2018"
 

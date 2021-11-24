@@ -156,7 +156,7 @@ impl<P:PoolParams> State<P> {
         let index = N_ITEMS*2;
         let a = derive_key_a(self.sigma, params);
         let eta = derive_key_eta(a.x, params);
-        let nullifier = nullifier(self.hashes[0][self.account_id*2] , eta, params);
+        let nullifier = nullifier(self.hashes[0][self.account_id*2], eta, Num::from(self.account_id as u32 * 2), params);
         let memo:Num<P::Fr> = rng.gen();
 
         

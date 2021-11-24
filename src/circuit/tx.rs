@@ -44,11 +44,12 @@ pub struct CTransferSec<C:CS> {
 pub fn c_nullfifier<C:CS, P: PoolParams<Fr = C::Fr>>(
     in_account_hash: &CNum<C>,
     eta: &CNum<C>,
+    path: &CNum<C>,
     params: &P,
 ) -> CNum<C> {
     let intermediate_hash = c_poseidon(
-        [in_account_hash.clone(), eta.clone()].as_ref(),
-        params.compress(),
+        [in_account_hash.clone(), eta.clone(), path.clone()].as_ref(),
+        params.nullifier_intermediate(),
     );
 
     c_poseidon(
@@ -174,14 +175,14 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         (&s.tx.input.1[i].p_d - c_derive_key_p_d(&s.tx.input.1[i].d.as_num(), &eta_bits, params).x).assert_zero();
     }
 
-    //check nullifier
-    (&p.nullifier - c_nullfifier(&in_account_hash, &eta, params)).assert_zero();
 
-
-    //build merkle proofs
+    //build merkle proofs and check nullifier
     {
         //assuming input_pos_index <= current_index
         let ref input_pos_index = c_from_bits_le(s.in_proof.0.path.as_slice());
+
+        //check nullifier
+        (&p.nullifier - c_nullfifier(&in_account_hash, &eta, input_pos_index, params)).assert_zero();
 
         let cur_root = c_poseidon_merkle_proof_root(&in_account_hash, &s.in_proof.0, params.compress());
         //assert root == cur_root || account.is_dummy()
@@ -193,9 +194,6 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
         //output_index <= current_index
         c_comp(output_index, &current_index, HEIGHT).assert_const(&false);
-
-        //protect from burning the account at zero self-transfer case
-        (s.tx.input.0.d.as_num()-s.tx.output.0.d.as_num()).assert_nonzero();
 
         //compute enegry
         total_enegry += s.tx.input.0.b.as_num() * (&current_index - input_pos_index);

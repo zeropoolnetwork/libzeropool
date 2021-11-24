@@ -38,8 +38,9 @@ lazy_static! {
             compress: poseidon_params_t_3,
             note: poseidon_params_t_5,
             account: poseidon_params_t_6.clone(),
-            eddsa: poseidon_params_t_4,
+            eddsa: poseidon_params_t_4.clone(),
             sponge: poseidon_params_t_6,
+            nullifier_intermediate: poseidon_params_t_4
         }
     };
 }

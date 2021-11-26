@@ -4,6 +4,7 @@ version = "0.5.1"
 authors = ["Igor Gulamov <igor.gulamov@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = "zk-SNARK circuit and cryptography for ZeroPool"
 
 [lib]
 crate-type = ["rlib"]

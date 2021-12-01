@@ -17,7 +17,7 @@ use evm_verifier::generate_sol_data;
 use fawkes_crypto::circuit::cs::CS;
 use fawkes_crypto::rand::rngs::OsRng;
 use libzeropool::helpers::sample_data::State;
-
+use convert_case::{Case, Casing};
 
 #[derive(Clap)]
 struct Opts {
@@ -148,14 +148,7 @@ fn cli_setup(o:SetupOpts) {
 fn cli_generate_verifier(o: GenerateVerifierOpts) {
     let circuit = o.circuit.clone();
     let vk_path = o.vk.unwrap_or(format!("{}_verification_key.json", circuit));
-    let contract_name = o.contract_name.unwrap_or_else(|| {
-        let s = format!("{}Verifier", circuit);
-        let mut c = s.chars();
-        match c.next() {
-            None => String::new(),
-            Some(f) => f.to_uppercase().chain(c).collect(),
-        }
-    });
+    let contract_name = o.contract_name.unwrap_or(format!("{}_verifier", circuit).to_case(Case::Pascal));
     let solidity_path = o.solidity.unwrap_or(format!("{}_verifier.sol", circuit));
 
 

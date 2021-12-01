@@ -1,6 +1,6 @@
 [package]
 name = "libzeropool"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Igor Gulamov <igor.gulamov@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -26,6 +26,7 @@ serde_json = { version = "1.0"}
 lazy_static = "1.4.0"
 chacha20poly1305 = "0.8.0"
 clap={ package = "clap-v3", version = "3.0.0-beta.1", optional=true}
+convert_case = "0.4.0"
 
 [features]
 cli_libzeropool_setup = ["clap", "fawkes-crypto/rand_support", "fawkes-crypto/backend_bellman_groth16"]

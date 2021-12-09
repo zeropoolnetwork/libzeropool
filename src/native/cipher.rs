@@ -1,6 +1,6 @@
 use crate::{
     fawkes_crypto::{
-        ff_uint::{Num,  PrimeFieldParams, Uint, seedbox::{SeedboxChaCha20, SeedBox, SeedBoxGen}},
+        ff_uint::{Num, seedbox::{SeedboxChaCha20, SeedBox, SeedBoxGen}},
         borsh::{BorshSerialize, BorshDeserialize},
         native::ecc::{EdwardsPoint},
 
@@ -11,7 +11,7 @@ use crate::{
         params::PoolParams,
         key::{derive_key_a, derive_key_p_d}
     },
-    constants::{self, POLY_1305_TAG_SIZE}
+    constants
 };
 
 use sha3::{Digest, Keccak256};
@@ -19,17 +19,17 @@ use sha3::{Digest, Keccak256};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use chacha20poly1305::aead::{Aead, NewAead};
 
-fn keccak256(data:&[u8])->[u8;32] {
+fn keccak256(data:&[u8])->[u8;constants::U256_SIZE] {
     let mut hasher = Keccak256::new();
     hasher.update(data);
-    let mut res = [0u8;32];
+    let mut res = [0u8;constants::U256_SIZE];
     res.iter_mut().zip(hasher.finalize().into_iter()).for_each(|(l,r)| *l=r);
     res
 }
 
 //key stricly assumed to be unique for all messages. Using this function with multiple messages and one key is insecure!
 fn symcipher_encode(key:&[u8], data:&[u8])->Vec<u8> {
-    assert!(key.len()==32);
+    assert!(key.len()==constants::U256_SIZE);
     let nonce = Nonce::from_slice(&constants::ENCRYPTION_NONCE);
     let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
     cipher.encrypt(nonce, data.as_ref()).unwrap()
@@ -37,7 +37,7 @@ fn symcipher_encode(key:&[u8], data:&[u8])->Vec<u8> {
 
 //key stricly assumed to be unique for all messages. Using this function with multiple messages and one key is insecure!
 fn symcipher_decode(key:&[u8], data:&[u8])->Option<Vec<u8>> {
-    assert!(key.len()==32);
+    assert!(key.len()==constants::U256_SIZE);
     let nonce = Nonce::from_slice(&constants::ENCRYPTION_NONCE);
     let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
     cipher.decrypt(nonce, data).ok()
@@ -55,12 +55,12 @@ pub fn encrypt<P: PoolParams>(
 ) -> Vec<u8> {
     let nozero_notes_num = note.len();
     let nozero_items_num = nozero_notes_num+1;
-    
+
 
     let mut sb = SeedboxChaCha20::new_with_salt(entropy);
 
     let account_data = {
-        let mut account_key = [0u8;32];
+        let mut account_key = [0u8;constants::U256_SIZE];
         sb.fill_bytes(&mut account_key);
         let account_ciphertext = symcipher_encode(&account_key, &account.try_to_vec().unwrap());
         (account_key, account_ciphertext)
@@ -120,10 +120,10 @@ fn buf_take<'a>(memo: &mut &'a[u8], size:usize) -> Option<&'a[u8]> {
 }
 
 pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Option<(Account<P::Fr>, Vec<Note<P::Fr>>)> {
-    let fr_size = <P::Fr as PrimeFieldParams>::Inner::NUM_WORDS * <P::Fr as PrimeFieldParams>::Inner::WORD_BITS / 8;
-    let account_size = fr_size +  (constants::HEIGHT + constants::BALANCE_SIZE_BITS + constants::ENERGY_SIZE_BITS + constants::DIVERSIFIER_SIZE_BITS)/8;
-    let note_size = fr_size + (constants::DIVERSIFIER_SIZE_BITS + constants::BALANCE_SIZE_BITS+constants::SALT_SIZE_BITS)/8;
-    let u256_size = 32;
+    let num_size = constants::num_size_bits::<P::Fr>()/8;
+    let account_size = constants::account_size_bits::<P::Fr>()/8;
+    let note_size = constants::note_size_bits::<P::Fr>()/8;
+
 
     let nozero_items_num = u32::deserialize(&mut memo).ok()? as usize;
     if nozero_items_num == 0 {
@@ -131,7 +131,7 @@ pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Op
     }
 
     let nozero_notes_num = nozero_items_num - 1;
-    let shared_secret_ciphertext_size = nozero_items_num * u256_size + POLY_1305_TAG_SIZE;
+    let shared_secret_ciphertext_size = nozero_items_num * constants::U256_SIZE + constants::POLY_1305_TAG_SIZE;
 
     let account_hash = Num::deserialize(&mut memo).ok()?;
     let note_hash = (0..nozero_notes_num).map(|_| Num::deserialize(&mut memo)).collect::<Result<Vec<_>, _>>().ok()?;
@@ -145,10 +145,10 @@ pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Op
     };
     let mut shared_secret_text_ptr =&shared_secret_text[..];
 
-    let account_key= <[u8;32]>::deserialize(&mut shared_secret_text_ptr).ok()?;
-    let note_key = (0..nozero_notes_num).map(|_| <[u8;32]>::deserialize(&mut shared_secret_text_ptr)).collect::<Result<Vec<_>,_>>().ok()?;
+    let account_key= <[u8;constants::U256_SIZE]>::deserialize(&mut shared_secret_text_ptr).ok()?;
+    let note_key = (0..nozero_notes_num).map(|_| <[u8;constants::U256_SIZE]>::deserialize(&mut shared_secret_text_ptr)).collect::<Result<Vec<_>,_>>().ok()?;
 
-    let account_ciphertext = buf_take(&mut memo, account_size+POLY_1305_TAG_SIZE)?;
+    let account_ciphertext = buf_take(&mut memo, account_size+constants::POLY_1305_TAG_SIZE)?;
     let account_text = symcipher_decode(&account_key, account_ciphertext)?;
     let account = Account::try_from_slice(&account_text).ok()?;
 
@@ -157,8 +157,8 @@ pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Op
     }
 
     let note = (0..nozero_notes_num).map(|i| {
-        buf_take(&mut memo, fr_size)?;
-        let ciphertext = buf_take(&mut memo, note_size+POLY_1305_TAG_SIZE)?;
+        buf_take(&mut memo, num_size)?;
+        let ciphertext = buf_take(&mut memo, note_size+constants::POLY_1305_TAG_SIZE)?;
         let text = symcipher_decode(&note_key[i], ciphertext)?;
         let note = Note::try_from_slice(&text).ok()?;
         if note.hash(params) != note_hash[i] {
@@ -172,10 +172,10 @@ pub fn decrypt_out<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Op
 }
 
 fn _decrypt_in<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Option<Vec<Option<Note<P::Fr>>>> {
-    let fr_size = <P::Fr as PrimeFieldParams>::Inner::NUM_WORDS * <P::Fr as PrimeFieldParams>::Inner::WORD_BITS / 8;
-    let account_size = fr_size +  (constants::HEIGHT + constants::BALANCE_SIZE_BITS + constants::ENERGY_SIZE_BITS + constants::DIVERSIFIER_SIZE_BITS)/8;
-    let note_size = fr_size + (constants::DIVERSIFIER_SIZE_BITS + constants::BALANCE_SIZE_BITS+constants::SALT_SIZE_BITS)/8;
-    let u256_size = 32;
+    let num_size = constants::num_size_bits::<P::Fr>()/8;
+    let account_size = constants::account_size_bits::<P::Fr>()/8;
+    let note_size = constants::note_size_bits::<P::Fr>()/8;
+
 
     let nozero_items_num = u32::deserialize(&mut memo).ok()? as usize;
     if nozero_items_num == 0 {
@@ -183,14 +183,14 @@ fn _decrypt_in<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Option
     }
 
     let nozero_notes_num = nozero_items_num - 1;
-    let shared_secret_ciphertext_size = nozero_items_num * u256_size + POLY_1305_TAG_SIZE;
+    let shared_secret_ciphertext_size = nozero_items_num * constants::U256_SIZE + constants::POLY_1305_TAG_SIZE;
 
-    buf_take(&mut memo, fr_size)?;
+    buf_take(&mut memo, num_size)?;
     let note_hash = (0..nozero_notes_num).map(|_| Num::deserialize(&mut memo)).collect::<Result<Vec<_>, _>>().ok()?;
 
-    buf_take(&mut memo, fr_size)?;
+    buf_take(&mut memo, num_size)?;
     buf_take(&mut memo, shared_secret_ciphertext_size)?;
-    buf_take(&mut memo, account_size+POLY_1305_TAG_SIZE)?;
+    buf_take(&mut memo, account_size+constants::POLY_1305_TAG_SIZE)?;
 
 
     let note = (0..nozero_notes_num).map(|i| {
@@ -198,7 +198,7 @@ fn _decrypt_in<P: PoolParams>(eta:Num<P::Fr>, mut memo:&[u8], params:&P)->Option
         let ecdh = a_pub.mul(eta.to_other_reduced(), params.jubjub());
         let key = keccak256(&ecdh.x.try_to_vec().unwrap());
 
-        let ciphertext = buf_take(&mut memo, note_size+POLY_1305_TAG_SIZE)?;
+        let ciphertext = buf_take(&mut memo, note_size+constants::POLY_1305_TAG_SIZE)?;
         let text = symcipher_decode(&key, ciphertext)?;
         let note = Note::try_from_slice(&text).ok()?;
         if note.hash(params) != note_hash[i] {

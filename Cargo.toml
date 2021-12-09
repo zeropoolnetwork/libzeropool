@@ -1,6 +1,6 @@
 [package]
 name = "libzeropool"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Igor Gulamov <igor.gulamov@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -29,8 +29,12 @@ clap={ package = "clap-v3", version = "3.0.0-beta.1", optional=true}
 convert_case = "0.4.0"
 
 [features]
+in1out127=[]
+in3out127=[]
+in7ount127=[]
+in15out127=[]
 cli_libzeropool_setup = ["clap", "fawkes-crypto/rand_support", "fawkes-crypto/backend_bellman_groth16"]
-default=["cli_libzeropool_setup"]
+default=["cli_libzeropool_setup", "in3out127"]
 
 [dev-dependencies]
 fawkes-crypto = { version = "4.3.0", features = ["rand_support", "backend_bellman_groth16"] }

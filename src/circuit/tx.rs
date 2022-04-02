@@ -117,7 +117,7 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
     //parse delta
     let (delta_value, delta_energy, current_index, poolid) = c_parse_delta::<C,P>(&p.delta);
     let mut total_value = delta_value;
-    let mut total_enegry = delta_energy;
+    let mut total_energy = delta_energy;
 
     let input_index = s.tx.input.0.i.as_num();
     let output_index = s.tx.output.0.i.as_num();
@@ -195,8 +195,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         //output_index <= current_index
         c_comp(output_index, &current_index, HEIGHT).assert_const(&false);
 
-        //compute enegry
-        total_enegry += s.tx.input.0.b.as_num() * (&current_index - input_pos_index);
+        //compute energy
+        total_energy += s.tx.input.0.b.as_num() * (&current_index - input_pos_index);
     }
 
 
@@ -214,8 +214,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
         let note_dummy = s.tx.input.1[i].is_dummy_raw().is_zero();
         (note_index_ok | note_dummy).assert_const(&true);
 
-        //compute enegry
-        total_enegry += note_value * (&current_index - note_index);
+        //compute energy
+        total_energy += note_value * (&current_index - note_index);
     }
 
     //bind msg_hash to the circuit
@@ -241,10 +241,10 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
     total_value.assert_zero();
 
     //final check energy
-    total_enegry += s.tx.input.0.e.as_num();
-    total_enegry -= s.tx.output.0.e.as_num();
+    total_energy += s.tx.input.0.e.as_num();
+    total_energy -= s.tx.output.0.e.as_num();
 
-    //assuming no overflow when sum total_enegry
-    c_into_bits_le(&total_enegry, <C::Fr as PrimeFieldParams>::MODULUS_BITS as usize - 2);
+    //assuming no overflow when sum total_energy
+    c_into_bits_le(&total_energy, <C::Fr as PrimeFieldParams>::MODULUS_BITS as usize - 2);
 }
 

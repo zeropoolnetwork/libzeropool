@@ -6,6 +6,7 @@ pub mod account;
 pub mod cipher;
 pub mod key;
 pub mod tree;
+pub mod delegated_deposit;
 
 mod borsh;
 mod sample;

@@ -27,18 +27,22 @@ pub struct CDelegatedDeposit<C:CS> {
 
 
 
-fn num_to_iter_bits_be<C:CS>(n:&CNum<C>) -> impl Iterator<Item=CBool<C>> {
+pub fn num_to_iter_bits_be<C:CS>(n:&CNum<C>) -> impl Iterator<Item=CBool<C>> {
     assert!(C::Fr::MODULUS_BITS <= 256);
     let bits = c_into_bits_le_strict(n);
     let zero = n.derive_const(&false);
-    std::iter::repeat(zero).take(256 - bits.len()).chain(bits.into_iter().rev())
+    let bits_le = bits.into_iter().chain(std::iter::repeat(zero)).take(256).collect::<Vec<_>>();
+    let bits_be = bits_le.chunks(8).rev().flatten().cloned().collect::<Vec<_>>();
+    bits_be.into_iter()
 }
 
 
-fn boundednum_to_iter_bits_be<C:CS, const L:usize>(n:&CBoundedNum<C, L>) -> impl Iterator<Item=CBool<C>> {
+pub fn boundednum_to_iter_bits_be<C:CS, const L:usize>(n:&CBoundedNum<C, L>) -> impl Iterator<Item=CBool<C>> {
     assert!(L < C::Fr::MODULUS_BITS as usize);
-    let bits = c_into_bits_le(n.as_num(), L);
-    bits.into_iter().rev()
+    assert!(L%8 == 0);
+    let bits_le = c_into_bits_le(n.as_num(), L);
+    let bits_be = bits_le.chunks(8).rev().flatten().cloned().collect::<Vec<_>>();
+    bits_be.into_iter()
 }
 
 impl<C:CS> CDelegatedDeposit<C> {
@@ -95,3 +99,4 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
     let out_hash = [[out_account_hash].as_ref(), out_note_hash.as_slice()].concat();
     c_out_commitment_hash(&out_hash, params).assert_eq(&s.out_commitment_hash);
 }
+

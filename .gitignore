@@ -15,3 +15,11 @@ Cargo.lock
 /target
 
 .vscode
+
+#Generated data
+**_inputs.json
+**_object.json
+**_params.bin
+**_proof.json
+**_key.json
+**_verifier.sol

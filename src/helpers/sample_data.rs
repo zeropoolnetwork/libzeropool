@@ -1,9 +1,12 @@
 
+use fawkes_crypto::{BorshSerialize, ff_uint::PrimeField};
+
 use crate::{constants, 
     fawkes_crypto::{
         ff_uint::Num,
         native::poseidon::{poseidon, MerkleProof}, 
         rand::{self, Rng},
+        core::sizedvec::SizedVec
     }, 
     native::{
         account::Account, 
@@ -11,9 +14,13 @@ use crate::{constants,
         note::Note, 
         params::{PoolParams}, 
         tx::{make_delta, Tx, TransferPub, TransferSec, nullifier, tx_hash, tx_sign, out_commitment_hash},
-        key::{derive_key_a, derive_key_eta, derive_key_p_d}
+        key::{derive_key_a, derive_key_eta, derive_key_p_d},
+        tree::{TreePub, TreeSec},
+        delegated_deposit::{DelegatedDepositBatchPub, DelegatedDepositBatchSec, DelegatedDeposit}
     }
 };
+
+use fawkes_crypto_keccak256::native::hash::keccak256;
 
 
 pub const N_ITEMS:usize = 1000;
@@ -141,7 +148,6 @@ impl<P:PoolParams> State<P> {
         }
     }
 
-    
 
     pub fn random_sample_transfer<R:Rng>(&self, rng:&mut R, params:&P) -> (TransferPub<P::Fr>, TransferSec<P::Fr>) {
 
@@ -247,5 +253,161 @@ impl<P:PoolParams> State<P> {
     fn root(&self) -> Num<P::Fr> {
         return self.cell(constants::HEIGHT, 0)
     }
+
+}
+
+
+pub fn random_sample_tree_update<P:PoolParams,R:Rng>(rng:&mut R, params:&P) -> (TreePub<P::Fr>, TreeSec<P::Fr>) {
+    use std::collections::HashMap;
+
+    let index_filled:usize = rng.gen_range(0, N_ITEMS);
+    let index_free = index_filled + 1;
+
+    const PATH_LENGTH:usize = constants::HEIGHT-constants::OUTPLUSONELOG;
+    
+    let mut cell = HashMap::new();
+
+    let zero_leaf_value = {
+        let mut c = Num::ZERO;
+        for _ in 0..constants::OUTPLUSONELOG {
+            c = poseidon(&[c, c], params.compress());
+        }
+        c
+    };
+
+    let cell_defaults = {
+        let mut c = zero_leaf_value;
+        let mut res = vec![c;PATH_LENGTH+1];
+        for i in 1..PATH_LENGTH {
+            c = poseidon(&[c,c], params.compress());
+            res[i] = c;
+        }
+        res
+    };
+
+    macro_rules! cell_get {
+        ($h:expr, $i:expr) => { cell.get(&(($h),($i))).unwrap_or_else(||&cell_defaults[($h)]).clone() }
+    }
+
+    macro_rules! cell_set {
+        ($h:expr, $i:expr, $v:expr) => { cell.insert((($h),($i)), ($v)); }
+    }
+
+
+    
+    let prev_leaf:Num<P::Fr> = rng.gen();
+    cell_set!(0, index_filled, prev_leaf);
+    for h in 0..PATH_LENGTH {
+        let index_level = index_filled>>h;
+        if index_level & 1 == 1 {
+            cell_set!(h, index_level^1, rng.gen());
+        }
+    }
+
+    for h in 1..PATH_LENGTH+1 {
+        let index = index_filled>>h;
+        let left = cell_get!(h-1, index*2);
+        let right = cell_get!(h-1, index*2+1);
+        let hash = poseidon(&[left,right], params.compress());
+        cell_set!(h, index, hash);
+    }
+
+
+
+
+    let path_filled = (0..PATH_LENGTH).map(|i| (index_filled>>i)&1==1).collect();
+    let sibling_filled:SizedVec<Num<P::Fr>, PATH_LENGTH> = (0..PATH_LENGTH).map(|h| cell_get!(h, (index_filled>>h)^1 )).collect();
+    
+
+    let proof_filled = MerkleProof {
+        sibling: sibling_filled,
+        path: path_filled
+    };
+
+    let root_before = cell_get!(PATH_LENGTH, 0);
+
+    let path_free = (0..PATH_LENGTH).map(|i| (index_free>>i)&1==1).collect();
+    let sibling_free:SizedVec<Num<P::Fr>, PATH_LENGTH> = (0..PATH_LENGTH).map(|h| cell_get!(h, (index_free>>h)^1 )).collect();
+
+    let leaf = rng.gen();
+    cell_set!(0, index_free, leaf);
+
+    for h in 1..PATH_LENGTH+1 {
+        let index = index_free>>h;
+        let left = cell_get!(h-1, index*2);
+        let right = cell_get!(h-1, index*2+1);
+        let hash = poseidon(&[left,right], params.compress());
+        cell_set!(h, index, hash);
+    }
+
+    let root_after = cell_get!(PATH_LENGTH, 0);
+
+    let proof_free = MerkleProof {
+        sibling: sibling_free,
+        path: path_free
+    };
+
+    let p = TreePub {
+        root_before,
+        root_after,
+        leaf
+    };
+
+    let s = TreeSec {
+        proof_filled,
+        proof_free,
+        prev_leaf
+    };
+
+    (p,s)
+
+}
+
+pub fn serialize_scalar_and_delegated_deposits_be<Fr:PrimeField>(och:Num<Fr>, deposits:&[DelegatedDeposit<Fr>]) -> Vec<u8> {
+    deposits.iter().rev().flat_map(|d| {
+        let mut res = d.b.try_to_vec().unwrap();
+        res.extend(d.p_d.try_to_vec().unwrap());
+        res.extend(d.d.try_to_vec().unwrap());
+        res
+        
+    }).chain(och.try_to_vec().unwrap()).rev().collect::<Vec<_>>()
+}
+
+pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P) -> (DelegatedDepositBatchPub<P::Fr>, DelegatedDepositBatchSec<P::Fr>) {
+    let out_account = Account::sample(rng, params);
+    
+    let deposits:SizedVec<_,{constants::OUT}> = (0..constants::OUT).map(|_| {
+        let n = Note::sample(rng, params);
+        DelegatedDeposit {
+            d:n.d,
+            p_d:n.p_d,
+            b:n.b,
+        }
+    }).collect();
+
+    let out_account_hash = out_account.hash(params);
+    let out_note_hash:Vec<_> = deposits.iter().map(|d| d.to_note())
+        .map(|n| n.hash(params)).collect();
+
+    let out_hash = [[out_account_hash].as_ref(), out_note_hash.as_slice()].concat();
+    let och = out_commitment_hash(&out_hash, params);
+
+
+    let data = serialize_scalar_and_delegated_deposits_be(och, deposits.as_slice());
+
+    
+    let keccak_sum = {
+        let t = keccak256(&data);
+        let mut res = Num::ZERO;
+        let mut mpl = Num::ONE;
+        for limb in t.iter() {
+            res = res + mpl * Num::from(*limb);
+            mpl = mpl * Num::from(256);
+        }
+        res
+    };
+    let p = DelegatedDepositBatchPub {keccak_sum};
+    let s = DelegatedDepositBatchSec {out_account, out_commitment_hash:och, deposits};
+    (p,s)
 
 }

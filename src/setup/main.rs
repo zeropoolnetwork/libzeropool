@@ -4,6 +4,7 @@ use libzeropool::{
     POOL_PARAMS,
     circuit::tree::{tree_update, CTreePub, CTreeSec},
     circuit::tx::{c_transfer, CTransferPub, CTransferSec},
+    circuit::delegated_deposit::{check_delegated_deposit_batch, CDelegatedDepositBatchPub, CDelegatedDepositBatchSec},
     clap::Clap,
 };
 use core::panic;
@@ -16,7 +17,7 @@ use fawkes_crypto::backend::bellman_groth16::{verifier::{VK, verify}, prover::{P
 use evm_verifier::generate_sol_data;
 use fawkes_crypto::circuit::cs::CS;
 use fawkes_crypto::rand::rngs::OsRng;
-use libzeropool::helpers::sample_data::State;
+use libzeropool::helpers::sample_data::{State, random_sample_tree_update, random_sample_delegated_deposit};
 use convert_case::{Case, Casing};
 
 #[derive(Clap)]
@@ -125,6 +126,10 @@ fn tx_circuit<C:CS<Fr=Fr>>(public: CTransferPub<C>, secret: CTransferSec<C>) {
     c_transfer(&public, &secret, &*POOL_PARAMS);
 }
 
+fn delegated_deposit_circuit<C:CS<Fr=Fr>>(public: CDelegatedDepositBatchPub<C>, secret: CDelegatedDepositBatchSec<C>) {
+    check_delegated_deposit_batch(&public, &secret, &*POOL_PARAMS);
+}
+
 fn cli_setup(o:SetupOpts) {
     let params_path = o.params.unwrap_or(format!("{}_params.bin", o.circuit));
     let vk_path = o.vk.unwrap_or(format!("{}_verification_key.json", o.circuit));
@@ -133,6 +138,7 @@ fn cli_setup(o:SetupOpts) {
     let params = match o.circuit.as_str() {
         "tree_update" => setup::<Bn256, _, _, _>(tree_circuit),
         "transfer" => setup::<Bn256, _, _, _>(tx_circuit),
+        "delegated_deposit" => setup::<Bn256, _, _, _>(delegated_deposit_circuit),
         _ => panic!("Wrong cicruit parameter")
     };
 
@@ -177,18 +183,25 @@ fn cli_verify(o:VerifyOpts) {
 
 fn cli_generate_test_data(o:GenerateTestDataOpts) {
     let object_path = o.object.unwrap_or(format!("{}_object.json", o.circuit));
-
-    match o.circuit.as_str() {
+    let mut rng = OsRng::default();
+    let data_str = match o.circuit.as_str() {
         "transfer" => {
-            let mut rng = OsRng::default();
             let state = State::random_sample_state(&mut rng, &*POOL_PARAMS);
             let data = state.random_sample_transfer(&mut rng, &*POOL_PARAMS);
-            let data_str = serde_json::to_string_pretty(&data).unwrap();
-            std::fs::write(object_path, &data_str.into_bytes()).unwrap();
+            serde_json::to_string_pretty(&data).unwrap()
+            
         },
-        "tree_update" => std::unimplemented!(),
+        "tree_update" => {
+            let data = random_sample_tree_update(&mut rng, &*POOL_PARAMS);
+            serde_json::to_string_pretty(&data).unwrap()
+        },
+        "delegated_deposit" => {
+            let data = random_sample_delegated_deposit(&mut rng, &*POOL_PARAMS);
+            serde_json::to_string_pretty(&data).unwrap()
+        },
         _ => panic!("Wrong cicruit parameter")
-    }
+    };
+    std::fs::write(object_path, &data_str.into_bytes()).unwrap();
 
     println!("Test data generated")
 
@@ -206,12 +219,20 @@ fn cli_prove(o:ProveOpts) {
     let params = Parameters::<Bn256>::read(&mut params_data_cur, false, false).unwrap();
     let object_str = std::fs::read_to_string(object_path).unwrap();
 
-    let (inputs, snark_proof) = if o.circuit.eq("tree_update") {
-        let (public, secret) = serde_json::from_str(&object_str).unwrap();
-        prove(&params, &public, &secret, tree_circuit)
-    } else {
-        let (public, secret) = serde_json::from_str(&object_str).unwrap();
-        prove(&params, &public, &secret, tx_circuit)
+    let (inputs, snark_proof) = match o.circuit.as_str() {
+        "transfer" => {
+            let (public, secret) = serde_json::from_str(&object_str).unwrap();
+            prove(&params, &public, &secret, tx_circuit)
+        },
+        "tree_update" => {
+            let (public, secret) = serde_json::from_str(&object_str).unwrap();
+            prove(&params, &public, &secret, tree_circuit)
+        },
+        "delegated_deposit" => {
+            let (public, secret) = serde_json::from_str(&object_str).unwrap();
+            prove(&params, &public, &secret, delegated_deposit_circuit)  
+        },
+        _ => panic!("Wrong cicruit parameter")
     };
 
 

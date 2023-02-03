@@ -2,7 +2,7 @@ use libzeropool::{POOL_PARAMS,
     circuit::delegated_deposit::{CDelegatedDepositBatchPub, CDelegatedDepositBatchSec, check_delegated_deposit_batch, CDelegatedDeposit, num_to_iter_bits_be},
     native::note::Note,
     native::delegated_deposit::{DelegatedDeposit},
-    helpers::sample_data::serialize_scalar_and_delegated_deposits_be,
+    helpers::sample_data::serialize_scalars_and_delegated_deposits_be,
     fawkes_crypto::{
         circuit::{
             cs::{CS, DebugCS},
@@ -51,8 +51,9 @@ fn test_bitify_delegated_deposits_be() {
     }).collect();
 
     let och = rng.gen();
+    let out_account_hash = rng.gen();
 
-    let data = serialize_scalar_and_delegated_deposits_be(och, deposits.as_slice());
+    let data = serialize_scalars_and_delegated_deposits_be(och, out_account_hash, deposits.as_slice());
 
     let bitlen = data.len()*8;
 
@@ -66,8 +67,11 @@ fn test_bitify_delegated_deposits_be() {
 
     let c_deposits:SizedVec<CDelegatedDeposit<DebugCS<Fr>>,{N_ITEMS}> = Signal::alloc(cs, Some(deposits).as_ref());
     let c_och = CNum::alloc(cs, Some(och).as_ref());
+    let c_out_account_hash = CNum::alloc(cs, Some(out_account_hash).as_ref());
     
-    let c_bits = num_to_iter_bits_be(&c_och).chain(c_deposits.iter().flat_map(
+    let c_bits = num_to_iter_bits_be(&c_och)
+    .chain(num_to_iter_bits_be(&c_out_account_hash))
+    .chain(c_deposits.iter().flat_map(
         |d| d.to_iter_bits_be()
     )).collect::<Vec<_>>();
 

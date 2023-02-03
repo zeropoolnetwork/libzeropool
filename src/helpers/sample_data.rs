@@ -363,20 +363,23 @@ pub fn random_sample_tree_update<P:PoolParams,R:Rng>(rng:&mut R, params:&P) -> (
 
 }
 
-pub fn serialize_scalar_and_delegated_deposits_be<Fr:PrimeField>(och:Num<Fr>, deposits:&[DelegatedDeposit<Fr>]) -> Vec<u8> {
+pub fn serialize_scalars_and_delegated_deposits_be<Fr:PrimeField>(och:Num<Fr>, out_account_hash:Num<Fr>, deposits:&[DelegatedDeposit<Fr>]) -> Vec<u8> {
     deposits.iter().rev().flat_map(|d| {
         let mut res = d.b.try_to_vec().unwrap();
         res.extend(d.p_d.try_to_vec().unwrap());
         res.extend(d.d.try_to_vec().unwrap());
         res
         
-    }).chain(och.try_to_vec().unwrap()).rev().collect::<Vec<_>>()
+    })
+    .chain(out_account_hash.try_to_vec().unwrap())
+    .chain(och.try_to_vec().unwrap())
+    .rev().collect::<Vec<_>>()
 }
 
 pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P) -> (DelegatedDepositBatchPub<P::Fr>, DelegatedDepositBatchSec<P::Fr>) {
     let out_account = Account::sample(rng, params);
     
-    let deposits:SizedVec<_,{constants::OUT}> = (0..constants::OUT).map(|_| {
+    let deposits:SizedVec<_,{constants::DELEGATED_DEPOSITS_NUM}> = (0..constants::DELEGATED_DEPOSITS_NUM).map(|_| {
         let n = Note::sample(rng, params);
         DelegatedDeposit {
             d:n.d,
@@ -385,24 +388,30 @@ pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P
         }
     }).collect();
 
+    let zero_note_hash = (Note {
+        d:BoundedNum::new(Num::ZERO),
+        p_d:Num::ZERO,
+        b:BoundedNum::new(Num::ZERO),
+        t:BoundedNum::new(Num::ZERO)
+    }).hash(params);
+
     let out_account_hash = out_account.hash(params);
+
     let out_note_hash:Vec<_> = deposits.iter().map(|d| d.to_note())
-        .map(|n| n.hash(params)).collect();
+        .map(|n| n.hash(params)).chain(std::iter::repeat(zero_note_hash)).take(constants::OUT).collect();
 
     let out_hash = [[out_account_hash].as_ref(), out_note_hash.as_slice()].concat();
     let och = out_commitment_hash(&out_hash, params);
 
 
-    let data = serialize_scalar_and_delegated_deposits_be(och, deposits.as_slice());
+    let data = serialize_scalars_and_delegated_deposits_be(och, out_account_hash, deposits.as_slice());
 
     
     let keccak_sum = {
         let t = keccak256(&data);
         let mut res = Num::ZERO;
-        let mut mpl = Num::ONE;
         for limb in t.iter() {
-            res = res + mpl * Num::from(*limb);
-            mpl = mpl * Num::from(256);
+            res = res * Num::from(256) + Num::from(*limb);
         }
         res
     };

@@ -2,7 +2,7 @@ use fawkes_crypto::ff_uint::{Num, PrimeField};
 use crate::native::{boundednum::BoundedNum, note::Note};
 use std::fmt::Debug;
 use crate::fawkes_crypto::core::sizedvec::SizedVec;
-use crate::constants::{DIVERSIFIER_SIZE_BITS, BALANCE_SIZE_BITS, OUT};
+use crate::constants::{DIVERSIFIER_SIZE_BITS, BALANCE_SIZE_BITS, DELEGATED_DEPOSITS_NUM};
 use crate::native::account::Account;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,5 +36,5 @@ pub struct DelegatedDepositBatchPub<Fr:PrimeField> {
 pub struct DelegatedDepositBatchSec<Fr:PrimeField> {
     pub out_account:Account<Fr>,
     pub out_commitment_hash: Num<Fr>,
-    pub deposits: SizedVec<DelegatedDeposit<Fr>, OUT>
+    pub deposits: SizedVec<DelegatedDeposit<Fr>, DELEGATED_DEPOSITS_NUM>
 }

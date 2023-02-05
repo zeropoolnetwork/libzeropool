@@ -372,6 +372,7 @@ pub fn serialize_scalars_and_delegated_deposits_be<Fr:PrimeField>(och:Num<Fr>, o
         
     })
     .chain(out_account_hash.try_to_vec().unwrap())
+    .chain(vec![0xff;4])
     .chain(och.try_to_vec().unwrap())
     .rev().collect::<Vec<_>>()
 }

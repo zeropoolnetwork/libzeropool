@@ -7,6 +7,7 @@ use libzeropool::{POOL_PARAMS,
         circuit::{
             cs::{CS, DebugCS},
             num::CNum,
+            bool::CBool
         }, 
         core::{signal::Signal, sizedvec::SizedVec},
         rand::{thread_rng, Rng},
@@ -66,10 +67,12 @@ fn test_bitify_delegated_deposits_be() {
     let ref cs = DebugCS::rc_new();
 
     let c_deposits:SizedVec<CDelegatedDeposit<DebugCS<Fr>>,{N_ITEMS}> = Signal::alloc(cs, Some(deposits).as_ref());
+    let c_true = CBool::from_const(cs, &true);
     let c_och = CNum::alloc(cs, Some(och).as_ref());
     let c_out_account_hash = CNum::alloc(cs, Some(out_account_hash).as_ref());
     
     let c_bits = num_to_iter_bits_be(&c_och)
+    .chain(std::iter::repeat(c_true).take(32))
     .chain(num_to_iter_bits_be(&c_out_account_hash))
     .chain(c_deposits.iter().flat_map(
         |d| d.to_iter_bits_be()

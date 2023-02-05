@@ -88,10 +88,13 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
 ) {
     assert!(DELEGATED_DEPOSITS_NUM <= OUT);
     let cs = p.get_cs();
+    let c_true = CBool::from_const(cs, &true);
     let out_account_hash = s.out_account.hash(params);
 
     let bits:Vec<_> = num_to_iter_bits_be(&s.out_commitment_hash)
-    .chain(num_to_iter_bits_be(&out_account_hash)).chain(
+    .chain(std::iter::repeat(c_true).take(32))
+    .chain(num_to_iter_bits_be(&out_account_hash))
+    .chain(
         s.deposits.iter().flat_map(
             |d| d.to_iter_bits_be()
     )).collect();

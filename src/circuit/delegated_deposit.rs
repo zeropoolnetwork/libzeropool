@@ -2,8 +2,7 @@ use crate::fawkes_crypto::circuit::{
     bool::CBool,
     num::CNum,
     bitify::{c_into_bits_le_strict, c_into_bits_le, c_from_bits_le},
-    cs::{RCS, CS}, 
-    poseidon::CMerkleProof
+    cs::{RCS, CS}
 };
 use crate::fawkes_crypto::ff_uint::{PrimeFieldParams, Num};
 use crate::fawkes_crypto::core::{
@@ -14,7 +13,6 @@ use crate::circuit::{
     boundednum::CBoundedNum, 
     note::CNote,
     tx::c_out_commitment_hash,
-    tree::{CTreePub, CTreeSec, tree_update}
 };
 use crate::native::{
     params::PoolParams,
@@ -23,7 +21,7 @@ use crate::native::{
     account::Account,
     delegated_deposit::{DelegatedDeposit, DelegatedDepositBatchPub, DelegatedDepositBatchSec}
 };
-use crate::constants::{DIVERSIFIER_SIZE_BITS, BALANCE_SIZE_BITS, DELEGATED_DEPOSITS_NUM, OUT, HEIGHT, OUTPLUSONELOG};
+use crate::constants::{DIVERSIFIER_SIZE_BITS, BALANCE_SIZE_BITS, DELEGATED_DEPOSITS_NUM, OUT};
 use fawkes_crypto_keccak256::circuit::hash::c_keccak256;
 
 #[derive(Clone, Signal)]
@@ -83,12 +81,8 @@ pub struct CDelegatedDepositBatchPub<C:CS> {
 #[derive(Clone, Signal)]
 #[Value = "DelegatedDepositBatchSec<C::Fr>"]
 pub struct CDelegatedDepositBatchSec<C:CS> {
-    pub root_before: CNum<C>,
-    pub root_after: CNum<C>,
-    pub deposits: SizedVec<CDelegatedDeposit<C>, DELEGATED_DEPOSITS_NUM>,
-    pub proof_filled:CMerkleProof<C, {HEIGHT - OUTPLUSONELOG}>,
-    pub proof_free:CMerkleProof<C, {HEIGHT - OUTPLUSONELOG}>,
-    pub prev_leaf:CNum<C>,
+    pub out_commitment_hash: CNum<C>,
+    pub deposits: SizedVec<CDelegatedDeposit<C>, DELEGATED_DEPOSITS_NUM>
 }
 
 fn c_keccak256_be_reduced<C:CS>(cs:&RCS<C>, bits:&[CBool<C>]) -> CNum<C> {
@@ -104,8 +98,7 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
 ) {
     assert!(DELEGATED_DEPOSITS_NUM <= OUT);
     let cs = p.get_cs();
-    let bits:Vec<_> = num_to_iter_bits_be(&s.root_before)
-    .chain(num_to_iter_bits_be(&s.root_after))
+    let bits:Vec<_> = num_to_iter_bits_be(&s.out_commitment_hash)
     .chain(
         s.deposits.iter().flat_map(
             |d| d.to_iter_bits_be()
@@ -133,22 +126,7 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
     .chain(s.deposits.iter().map(|d| d.to_note().hash(params)))
     .chain(std::iter::repeat(c_zero_note_hash)).take(OUT+1).collect::<Vec<_>>();
 
-    let out_commitment_hash = c_out_commitment_hash(&out_hash, params);
-
-    // this variable is not public in this circuit
-    let tree_pub = CTreePub {
-        root_before: s.root_before.clone(),
-        root_after: s.root_after.clone(),
-        leaf: out_commitment_hash.clone(),
-    };
-
-    let tree_sec = CTreeSec {
-        proof_filled: s.proof_filled.clone(),
-        proof_free: s.proof_free.clone(),
-        prev_leaf: s.prev_leaf.clone(),
-    };
-
-    tree_update(&tree_pub, &tree_sec, params);
+    c_out_commitment_hash(&out_hash, params).assert_eq(&s.out_commitment_hash);
     
 }
 

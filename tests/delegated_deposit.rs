@@ -51,7 +51,7 @@ fn test_bitify_delegated_deposits_be() {
         }
     }).collect();
 
-    let roots:SizedVec<Num<Fr>,2> = (0..2).map(|_|rng.gen()).collect();
+    let roots:SizedVec<Num<Fr>,1> = (0..1).map(|_|rng.gen()).collect();
 
 
     let data = serialize_scalars_and_delegated_deposits_be(roots.as_slice(), deposits.as_slice());
@@ -68,7 +68,7 @@ fn test_bitify_delegated_deposits_be() {
 
     let c_deposits:SizedVec<CDelegatedDeposit<DebugCS<Fr>>,{N_ITEMS}> = Signal::alloc(cs, Some(deposits).as_ref());
 
-    let c_roots:SizedVec<CNum<DebugCS<Fr>>,2> = Signal::alloc(cs, Some(roots).as_ref());
+    let c_roots:SizedVec<CNum<DebugCS<Fr>>,1> = Signal::alloc(cs, Some(roots).as_ref());
     
     let c_bits = c_roots.iter().flat_map(num_to_iter_bits_be)
     .chain(c_deposits.iter().flat_map(

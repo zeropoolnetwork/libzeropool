@@ -1,6 +1,5 @@
 
 use fawkes_crypto::{BorshSerialize, ff_uint::PrimeField};
-use fawkes_crypto::native::poseidon::{poseidon_merkle_proof_root};
 
 use crate::{constants, 
     fawkes_crypto::{
@@ -409,14 +408,10 @@ pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P
 
     let _out_commitment_hash = out_commitment_hash(&out_hash, params);
 
-    let (mut tree_pub, tree_sec) = random_sample_tree_update(rng, params);
-
-    tree_pub.leaf = _out_commitment_hash;
-    tree_pub.root_after = poseidon_merkle_proof_root(tree_pub.leaf, &tree_sec.proof_free, params.compress());
-
+ 
 
     let data = serialize_scalars_and_delegated_deposits_be(
-        &[tree_pub.root_before, tree_pub.root_after], deposits.as_slice());
+        &[_out_commitment_hash], deposits.as_slice());
 
 
     
@@ -432,12 +427,9 @@ pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P
     let p = DelegatedDepositBatchPub {keccak_sum};
 
     let s = DelegatedDepositBatchSec {
-        root_before:tree_pub.root_before,
-        root_after:tree_pub.root_after,
-        proof_filled:tree_sec.proof_filled,
-        proof_free:tree_sec.proof_free,
-        prev_leaf: tree_sec.prev_leaf,
-        deposits};
+        out_commitment_hash:_out_commitment_hash,
+        deposits
+    };
     (p,s)
 
 }

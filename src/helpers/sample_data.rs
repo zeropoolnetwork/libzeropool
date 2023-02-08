@@ -1,5 +1,6 @@
 
 use fawkes_crypto::{BorshSerialize, ff_uint::PrimeField};
+use fawkes_crypto::native::poseidon::{poseidon_merkle_proof_root};
 
 use crate::{constants, 
     fawkes_crypto::{
@@ -104,7 +105,7 @@ impl<P:PoolParams> State<P> {
         }
 
         items[account_id].0.p_d = derive_key_p_d(items[account_id].0.d.to_num(), eta, params).x;
-        items[account_id].0.i = BoundedNum::new(Num::ZERO);
+        items[account_id].0.i = BoundedNum::ZERO;
 
         let mut default_hashes = vec![Num::ZERO;constants::HEIGHT+1];
         let mut hashes = vec![];
@@ -152,10 +153,10 @@ impl<P:PoolParams> State<P> {
     pub fn random_sample_transfer<R:Rng>(&self, rng:&mut R, params:&P) -> (TransferPub<P::Fr>, TransferSec<P::Fr>) {
 
         let zero_note = Note {
-            d: BoundedNum::new(Num::ZERO),
+            d: BoundedNum::ZERO,
             p_d: Num::ZERO,
-            b: BoundedNum::new(Num::ZERO),
-            t: BoundedNum::new(Num::ZERO),
+            b: BoundedNum::ZERO,
+            t: BoundedNum::ZERO,
         };
 
         let root = self.root();
@@ -187,7 +188,7 @@ impl<P:PoolParams> State<P> {
 
         
         let mut out_note: Note<P::Fr> = Note::sample(rng, params);
-        out_note.b = BoundedNum::new(Num::ZERO);
+        out_note.b = BoundedNum::ZERO;
 
         let mut input_hashes = vec![self.items[self.account_id].0.hash(params)];
         for &i in self.note_id.iter() {
@@ -363,7 +364,7 @@ pub fn random_sample_tree_update<P:PoolParams,R:Rng>(rng:&mut R, params:&P) -> (
 
 }
 
-pub fn serialize_scalars_and_delegated_deposits_be<Fr:PrimeField>(och:Num<Fr>, out_account_hash:Num<Fr>, deposits:&[DelegatedDeposit<Fr>]) -> Vec<u8> {
+pub fn serialize_scalars_and_delegated_deposits_be<Fr:PrimeField>(scalars:&[Num<Fr>], deposits:&[DelegatedDeposit<Fr>]) -> Vec<u8> {
     deposits.iter().rev().flat_map(|d| {
         let mut res = d.b.try_to_vec().unwrap();
         res.extend(d.p_d.try_to_vec().unwrap());
@@ -371,14 +372,12 @@ pub fn serialize_scalars_and_delegated_deposits_be<Fr:PrimeField>(och:Num<Fr>, o
         res
         
     })
-    .chain(out_account_hash.try_to_vec().unwrap())
-    .chain(vec![0xff;4])
-    .chain(och.try_to_vec().unwrap())
+    .chain(scalars.iter().rev().flat_map(|s| s.try_to_vec().unwrap()))
     .rev().collect::<Vec<_>>()
 }
 
+
 pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P) -> (DelegatedDepositBatchPub<P::Fr>, DelegatedDepositBatchSec<P::Fr>) {
-    let out_account = Account::sample(rng, params);
     
     let deposits:SizedVec<_,{constants::DELEGATED_DEPOSITS_NUM}> = (0..constants::DELEGATED_DEPOSITS_NUM).map(|_| {
         let n = Note::sample(rng, params);
@@ -389,23 +388,36 @@ pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P
         }
     }).collect();
 
-    let zero_note_hash = (Note {
-        d:BoundedNum::new(Num::ZERO),
+    let zero_note_hash = Note {
+        d:BoundedNum::ZERO,
         p_d:Num::ZERO,
-        b:BoundedNum::new(Num::ZERO),
-        t:BoundedNum::new(Num::ZERO)
-    }).hash(params);
+        b:BoundedNum::ZERO,
+        t:BoundedNum::ZERO
+    }.hash(params);
 
-    let out_account_hash = out_account.hash(params);
+    let zero_account_hash = Account {
+        d: BoundedNum::ZERO,
+        p_d: Num::ZERO,
+        i: BoundedNum::ZERO,
+        b: BoundedNum::ZERO,
+        e: BoundedNum::ZERO,
+    }.hash(params);
 
-    let out_note_hash:Vec<_> = deposits.iter().map(|d| d.to_note())
-        .map(|n| n.hash(params)).chain(std::iter::repeat(zero_note_hash)).take(constants::OUT).collect();
+    let out_hash = std::iter::once(zero_account_hash)
+    .chain(deposits.iter().map(|d| d.to_note().hash(params)))
+    .chain(std::iter::repeat(zero_note_hash)).take(constants::OUT+1).collect::<Vec<_>>();    
 
-    let out_hash = [[out_account_hash].as_ref(), out_note_hash.as_slice()].concat();
-    let och = out_commitment_hash(&out_hash, params);
+    let _out_commitment_hash = out_commitment_hash(&out_hash, params);
+
+    let (mut tree_pub, tree_sec) = random_sample_tree_update(rng, params);
+
+    tree_pub.leaf = _out_commitment_hash;
+    tree_pub.root_after = poseidon_merkle_proof_root(tree_pub.leaf, &tree_sec.proof_free, params.compress());
 
 
-    let data = serialize_scalars_and_delegated_deposits_be(och, out_account_hash, deposits.as_slice());
+    let data = serialize_scalars_and_delegated_deposits_be(
+        &[tree_pub.root_before, tree_pub.root_after], deposits.as_slice());
+
 
     
     let keccak_sum = {
@@ -416,8 +428,16 @@ pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P
         }
         res
     };
+
     let p = DelegatedDepositBatchPub {keccak_sum};
-    let s = DelegatedDepositBatchSec {out_account, out_commitment_hash:och, deposits};
+
+    let s = DelegatedDepositBatchSec {
+        root_before:tree_pub.root_before,
+        root_after:tree_pub.root_after,
+        proof_filled:tree_sec.proof_filled,
+        proof_free:tree_sec.proof_free,
+        prev_leaf: tree_sec.prev_leaf,
+        deposits};
     (p,s)
 
 }

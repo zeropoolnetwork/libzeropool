@@ -18,6 +18,9 @@ impl<Fr:PrimeField, const L: usize> PartialEq for BoundedNum<Fr, L> {
 
 
 impl<Fr:PrimeField, const L: usize> BoundedNum<Fr, L> {
+    pub const ONE: Self = BoundedNum(Num::<Fr>::ONE);
+    pub const ZERO: Self = BoundedNum(Num::<Fr>::ZERO);
+
     pub fn new(n:Num<Fr>) -> Self {
         assert!(L < Fr::MODULUS_BITS as usize && n.to_uint() < (NumRepr::<Fr::Inner>::ONE << L as u32));
         Self::new_unchecked(n)

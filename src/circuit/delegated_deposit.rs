@@ -1,22 +1,29 @@
 use crate::fawkes_crypto::circuit::{
     bool::CBool,
     num::CNum,
-    bitify::{c_into_bits_le_strict, c_into_bits_le, c_from_bits_le}
+    bitify::{c_into_bits_le_strict, c_into_bits_le, c_from_bits_le},
+    cs::{RCS, CS}, 
+    poseidon::CMerkleProof
 };
-use crate::fawkes_crypto::core::signal::Signal;
-use crate::fawkes_crypto::circuit::cs::{RCS, CS};
-use crate::circuit::{boundednum::CBoundedNum, note::CNote};
-use crate::native::delegated_deposit::{DelegatedDeposit, DelegatedDepositBatchPub, DelegatedDepositBatchSec};
 use crate::fawkes_crypto::ff_uint::{PrimeFieldParams, Num};
-use crate::constants::{DIVERSIFIER_SIZE_BITS, BALANCE_SIZE_BITS, DELEGATED_DEPOSITS_NUM, OUT};
-use crate::fawkes_crypto::core::sizedvec::SizedVec;
-use crate::native::params::PoolParams;
-use crate::native::note::Note;
-use crate::native::boundednum::BoundedNum;
-use crate::circuit::account::CAccount;
-use crate::circuit::tx::c_out_commitment_hash;
-
-
+use crate::fawkes_crypto::core::{
+    signal::Signal,
+    sizedvec::SizedVec
+};
+use crate::circuit::{
+    boundednum::CBoundedNum, 
+    note::CNote,
+    tx::c_out_commitment_hash,
+    tree::{CTreePub, CTreeSec, tree_update}
+};
+use crate::native::{
+    params::PoolParams,
+    note::Note,
+    boundednum::BoundedNum,
+    account::Account,
+    delegated_deposit::{DelegatedDeposit, DelegatedDepositBatchPub, DelegatedDepositBatchSec}
+};
+use crate::constants::{DIVERSIFIER_SIZE_BITS, BALANCE_SIZE_BITS, DELEGATED_DEPOSITS_NUM, OUT, HEIGHT, OUTPLUSONELOG};
 use fawkes_crypto_keccak256::circuit::hash::c_keccak256;
 
 #[derive(Clone, Signal)]
@@ -76,9 +83,18 @@ pub struct CDelegatedDepositBatchPub<C:CS> {
 #[derive(Clone, Signal)]
 #[Value = "DelegatedDepositBatchSec<C::Fr>"]
 pub struct CDelegatedDepositBatchSec<C:CS> {
-    pub out_account: CAccount<C>,
-    pub out_commitment_hash: CNum<C>,
-    pub deposits: SizedVec<CDelegatedDeposit<C>, { DELEGATED_DEPOSITS_NUM}>,
+    pub root_before: CNum<C>,
+    pub root_after: CNum<C>,
+    pub deposits: SizedVec<CDelegatedDeposit<C>, DELEGATED_DEPOSITS_NUM>,
+    pub proof_filled:CMerkleProof<C, {HEIGHT - OUTPLUSONELOG}>,
+    pub proof_free:CMerkleProof<C, {HEIGHT - OUTPLUSONELOG}>,
+    pub prev_leaf:CNum<C>,
+}
+
+fn c_keccak256_be_reduced<C:CS>(cs:&RCS<C>, bits:&[CBool<C>]) -> CNum<C> {
+    let keccak_bits_be = c_keccak256(cs, &bits);
+    let keccak_bits_le = keccak_bits_be.as_slice().chunks(8).rev().flatten().cloned().collect::<Vec<_>>();
+    c_from_bits_le(&keccak_bits_le)
 }
 
 pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
@@ -88,35 +104,51 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
 ) {
     assert!(DELEGATED_DEPOSITS_NUM <= OUT);
     let cs = p.get_cs();
-    let c_true = CBool::from_const(cs, &true);
-    let out_account_hash = s.out_account.hash(params);
-
-    let bits:Vec<_> = num_to_iter_bits_be(&s.out_commitment_hash)
-    .chain(std::iter::repeat(c_true).take(32))
-    .chain(num_to_iter_bits_be(&out_account_hash))
+    let bits:Vec<_> = num_to_iter_bits_be(&s.root_before)
+    .chain(num_to_iter_bits_be(&s.root_after))
     .chain(
         s.deposits.iter().flat_map(
             |d| d.to_iter_bits_be()
     )).collect();
 
-    let keccak_bits_be = c_keccak256(cs, &bits);
-    let keccak_bits_le = keccak_bits_be.as_slice().chunks(8).rev().flatten().cloned().collect::<Vec<_>>();
-    c_from_bits_le(&keccak_bits_le).assert_eq(&p.keccak_sum);
+    c_keccak256_be_reduced(cs, &bits).assert_eq(&p.keccak_sum);
     
-    let zero_note_hash = (Note {
-        d:BoundedNum::new(Num::ZERO),
+    let c_zero_account_hash = CNum::from_const(cs, &Account {
+        d:BoundedNum::ZERO,
         p_d:Num::ZERO,
-        b:BoundedNum::new(Num::ZERO),
-        t:BoundedNum::new(Num::ZERO)
-    }).hash(params);
+        i:BoundedNum::ZERO,
+        b:BoundedNum::ZERO,
+        e:BoundedNum::ZERO,
+    }.hash(params));
 
-    let c_zero_note_hash = CNum::from_const(cs, &zero_note_hash);
+    let c_zero_note_hash = CNum::from_const(cs, &Note {
+        d:BoundedNum::ZERO,
+        p_d:Num::ZERO,
+        b:BoundedNum::ZERO,
+        t:BoundedNum::ZERO
+    }.hash(params));
 
+
+    let out_hash = std::iter::once(c_zero_account_hash)
+    .chain(s.deposits.iter().map(|d| d.to_note().hash(params)))
+    .chain(std::iter::repeat(c_zero_note_hash)).take(OUT+1).collect::<Vec<_>>();
+
+    let out_commitment_hash = c_out_commitment_hash(&out_hash, params);
+
+    // this variable is not public in this circuit
+    let tree_pub = CTreePub {
+        root_before: s.root_before.clone(),
+        root_after: s.root_after.clone(),
+        leaf: out_commitment_hash.clone(),
+    };
+
+    let tree_sec = CTreeSec {
+        proof_filled: s.proof_filled.clone(),
+        proof_free: s.proof_free.clone(),
+        prev_leaf: s.prev_leaf.clone(),
+    };
+
+    tree_update(&tree_pub, &tree_sec, params);
     
-    let out_note_hash:Vec<_> = s.deposits.iter().map(|d| d.to_note())
-        .map(|n| n.hash(params)).chain(std::iter::repeat(c_zero_note_hash)).take(OUT).collect();
-
-    let out_hash = [[out_account_hash].as_ref(), out_note_hash.as_slice()].concat();
-    c_out_commitment_hash(&out_hash, params).assert_eq(&s.out_commitment_hash);
 }
 

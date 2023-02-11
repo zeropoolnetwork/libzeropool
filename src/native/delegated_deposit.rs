@@ -33,6 +33,5 @@ pub struct DelegatedDepositBatchPub<Fr:PrimeField> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 pub struct DelegatedDepositBatchSec<Fr:PrimeField> {
-    pub out_commitment_hash: Num<Fr>,
     pub deposits: SizedVec<DelegatedDeposit<Fr>, DELEGATED_DEPOSITS_NUM>
 }

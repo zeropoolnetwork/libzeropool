@@ -427,7 +427,6 @@ pub fn random_sample_delegated_deposit<P:PoolParams,R:Rng>(rng:&mut R, params:&P
     let p = DelegatedDepositBatchPub {keccak_sum};
 
     let s = DelegatedDepositBatchSec {
-        out_commitment_hash:_out_commitment_hash,
         deposits
     };
     (p,s)

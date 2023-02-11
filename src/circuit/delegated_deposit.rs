@@ -81,7 +81,6 @@ pub struct CDelegatedDepositBatchPub<C:CS> {
 #[derive(Clone, Signal)]
 #[Value = "DelegatedDepositBatchSec<C::Fr>"]
 pub struct CDelegatedDepositBatchSec<C:CS> {
-    pub out_commitment_hash: CNum<C>,
     pub deposits: SizedVec<CDelegatedDeposit<C>, DELEGATED_DEPOSITS_NUM>
 }
 
@@ -98,14 +97,7 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
 ) {
     assert!(DELEGATED_DEPOSITS_NUM <= OUT);
     let cs = p.get_cs();
-    let bits:Vec<_> = num_to_iter_bits_be(&s.out_commitment_hash)
-    .chain(
-        s.deposits.iter().flat_map(
-            |d| d.to_iter_bits_be()
-    )).collect();
 
-    c_keccak256_be_reduced(cs, &bits).assert_eq(&p.keccak_sum);
-    
     let c_zero_account_hash = CNum::from_const(cs, &Account {
         d:BoundedNum::ZERO,
         p_d:Num::ZERO,
@@ -126,7 +118,16 @@ pub fn check_delegated_deposit_batch<C:CS, P:PoolParams<Fr=C::Fr>>(
     .chain(s.deposits.iter().map(|d| d.to_note().hash(params)))
     .chain(std::iter::repeat(c_zero_note_hash)).take(OUT+1).collect::<Vec<_>>();
 
-    c_out_commitment_hash(&out_hash, params).assert_eq(&s.out_commitment_hash);
-    
+    let out_commitment_hash = c_out_commitment_hash(&out_hash, params);
+
+
+    let bits:Vec<_> = num_to_iter_bits_be(&out_commitment_hash)
+    .chain(
+        s.deposits.iter().flat_map(
+            |d| d.to_iter_bits_be()
+    )).collect();
+
+    c_keccak256_be_reduced(cs, &bits).assert_eq(&p.keccak_sum);
+       
 }
 

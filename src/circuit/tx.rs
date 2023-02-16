@@ -128,11 +128,16 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
     let in_note_hash = s.tx.input.1.iter().map(|n| n.hash(params)).collect::<Vec<_>>();
     let in_hash = [[in_account_hash.clone()].as_ref(), in_note_hash.as_slice()].concat();
 
-    //assert input notes are unique
+    //assert input note indexes are unique
+    let in_note_index:SizedVec<_,{IN}> = s.in_proof.1.iter().map(|p| c_from_bits_le(p.path.as_slice())).collect();
+    let in_note_dummy:SizedVec<_,{IN}> = s.tx.input.1.iter().map(|n| n.is_dummy_raw().is_zero()).collect();
+
     let mut t:CNum<C> = p.derive_const(&Num::ZERO);
     for i in 0..IN {
         for j in i+1..IN {
-            t+=(&in_note_hash[i]-&in_note_hash[j]).is_zero().as_num();
+            let indexes_equal = (&in_note_index[i] - &in_note_index[j]).is_zero();
+            let notes_nodummy = !(&in_note_dummy[i] & &in_note_dummy[j]);
+            t+=(indexes_equal & notes_nodummy).as_num();
         }
     }
     t.assert_zero();
@@ -202,7 +207,8 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
     for i in 0..IN {
         let note_value = s.tx.input.1[i].b.as_num();
-        let ref note_index = c_from_bits_le(s.in_proof.1[i].path.as_slice());
+        let ref note_index = in_note_index[i];
+        let ref note_dummy = in_note_dummy[i];
 
         let cur_root = c_poseidon_merkle_proof_root(&in_note_hash[i], &s.in_proof.1[i], params.compress());
         ((cur_root - &p.root) * note_value).assert_zero();
@@ -211,7 +217,6 @@ pub fn c_transfer<C:CS, P:PoolParams<Fr=C::Fr>>(
 
         //input_index <= note_index && note_index < output_index || note_dummy
         let note_index_ok = (!c_comp(input_index, note_index, HEIGHT)) & c_comp(output_index, note_index, HEIGHT);
-        let note_dummy = s.tx.input.1[i].is_dummy_raw().is_zero();
         (note_index_ok | note_dummy).assert_const(&true);
 
         //compute enegry

@@ -19,7 +19,7 @@ fn cli_setup(o:SetupOpts) {
     let params: Parameters<Bn256> = Parameters::setup(o.k);
 
     let mut fp = File::create(params_path).unwrap();
-    params.0.write(&mut fp).unwrap();
+    Params::write(&params.0, &mut fp).unwrap();
 
     println!("setup OK");
 }

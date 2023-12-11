@@ -1,7 +1,7 @@
 #[cfg(all(feature = "r1cs", feature = "plonk"))]
-compile_error!("Features \"r1cs\" and \"plonk\" are mutually exclusive");
+compile_error!("Features \"groth16\" and \"plonk\" are mutually exclusive");
 
-#[cfg(not(any(feature = "r1cs", feature = "plonk")))]
+#[cfg(not(any(feature = "groth16", feature = "plonk")))]
 compile_error!("At least one of features \"r1cs\" and \"plonk\" must be enabled");
 
 #[macro_use]

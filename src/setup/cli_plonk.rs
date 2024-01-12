@@ -5,8 +5,6 @@ use clap::Clap;
 use fawkes_crypto::{backend::plonk::{Parameters, engines::Bn256}, BorshSerialize, circuit::cs::CS};
 use fawkes_crypto::backend::plonk::setup::setup;
 use fawkes_crypto::engines::bn256::Fr;
-use near_halo2_verifier::bn256::G1Affine;
-use near_halo2_verifier::loader::NearLoader;
 use near_halo2_verifier::PlonkVerifierData;
 use libzeropool::circuit::tree::{CTreePub, CTreeSec, tree_update};
 use libzeropool::circuit::tx::{c_transfer, CTransferPub, CTransferSec};
@@ -44,7 +42,7 @@ fn cli_setup(o:SetupOpts) {
     let (vk, _) = setup(&params, tree_circuit);
     let tree_vd = PlonkVerifierData::new(params.0.clone(), vk.0, o.k);
     let tree_vd_bytes = tree_vd.try_to_vec().unwrap();
-    let mut fp = File::create("tree_vd.bin").unwrap();
+    let mut fp = File::create("tree_vk.bin").unwrap();
     fp.write_all(&tree_vd_bytes).unwrap();
 
     println!("tree OK");
@@ -52,7 +50,7 @@ fn cli_setup(o:SetupOpts) {
     let (vk, _) = setup(&params, tx_circuit);
     let tx_vd = PlonkVerifierData::new(params.0.clone(), vk.0, o.k);
     let tx_vd_bytes = tx_vd.try_to_vec().unwrap();
-    let mut fp = File::create("tx_vd.bin").unwrap();
+    let mut fp = File::create("tx_vk.bin").unwrap();
     fp.write_all(&tx_vd_bytes).unwrap();
 
     println!("tx OK");

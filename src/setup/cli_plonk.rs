@@ -75,7 +75,7 @@ struct SetupOpts {
     #[clap(short = "p", long = "params")]
     params: Option<String>,
     /// Security parameter
-    #[clap(short = "k", default_value = "16")]
+    #[clap(short = "k", default_value = "20")]
     k: usize,
 }
 

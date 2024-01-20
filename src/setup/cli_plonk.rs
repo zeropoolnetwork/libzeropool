@@ -39,18 +39,40 @@ fn cli_setup(o:SetupOpts) {
         Parameters::read(&mut fp).unwrap()
     };
 
-    let (vk, _) = setup(&params, tree_circuit);
+    let (vk, pk) = setup(&params, tree_circuit);
+
+    let mut buf = Vec::new();
+    vk.write(&mut buf).unwrap();
+    let mut fp = File::create("tree_vk.bin").unwrap();
+    fp.write_all(&buf).unwrap();
+
+    let mut buf = Vec::new();
+    pk.write(&mut buf).unwrap();
+    let mut fp = File::create("tree_pk.bin").unwrap();
+    fp.write_all(&buf).unwrap();
+
     let tree_vd = PlonkVerifierData::new(params.0.clone(), vk.0, o.k);
     let tree_vd_bytes = tree_vd.try_to_vec().unwrap();
-    let mut fp = File::create("tree_vk.bin").unwrap();
+    let mut fp = File::create("tree_vd.bin").unwrap();
     fp.write_all(&tree_vd_bytes).unwrap();
 
     println!("tree OK");
 
-    let (vk, _) = setup(&params, tx_circuit);
+    let (vk, pk) = setup(&params, tx_circuit);
+
+    let mut buf = Vec::new();
+    vk.write(&mut buf).unwrap();
+    let mut fp = File::create("transfer_vk.bin").unwrap();
+    fp.write_all(&buf).unwrap();
+
+    let mut buf = Vec::new();
+    pk.write(&mut buf).unwrap();
+    let mut fp = File::create("transfer_pk.bin").unwrap();
+    fp.write_all(&buf).unwrap();
+
     let tx_vd = PlonkVerifierData::new(params.0.clone(), vk.0, o.k);
     let tx_vd_bytes = tx_vd.try_to_vec().unwrap();
-    let mut fp = File::create("tx_vk.bin").unwrap();
+    let mut fp = File::create("transfer_vd.bin").unwrap();
     fp.write_all(&tx_vd_bytes).unwrap();
 
     println!("tx OK");

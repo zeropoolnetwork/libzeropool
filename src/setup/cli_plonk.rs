@@ -51,7 +51,7 @@ fn cli_setup(o:SetupOpts) {
     let mut fp = File::create("tree_pk.bin").unwrap();
     fp.write_all(&buf).unwrap();
 
-    let tree_vd = PlonkVerifierData::new(params.0.clone(), vk.0, o.k);
+    let tree_vd = PlonkVerifierData::new(params.0.clone(), vk.0, 3);
     let tree_vd_bytes = tree_vd.try_to_vec().unwrap();
     let mut fp = File::create("tree_vd.bin").unwrap();
     fp.write_all(&tree_vd_bytes).unwrap();
@@ -70,7 +70,7 @@ fn cli_setup(o:SetupOpts) {
     let mut fp = File::create("transfer_pk.bin").unwrap();
     fp.write_all(&buf).unwrap();
 
-    let tx_vd = PlonkVerifierData::new(params.0.clone(), vk.0, o.k);
+    let tx_vd = PlonkVerifierData::new(params.0.clone(), vk.0, 5);
     let tx_vd_bytes = tx_vd.try_to_vec().unwrap();
     let mut fp = File::create("transfer_vd.bin").unwrap();
     fp.write_all(&tx_vd_bytes).unwrap();

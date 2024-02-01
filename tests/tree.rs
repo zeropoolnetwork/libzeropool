@@ -1,3 +1,5 @@
+#![cfg(feature = "r1cs")]
+
 use fawkes_crypto::rand::Rng;
 use libzeropool::{POOL_PARAMS, circuit::tree::{CTreePub, CTreeSec, tree_update},
     native::tree::{TreePub, TreeSec},

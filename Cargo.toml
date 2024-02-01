@@ -14,11 +14,10 @@ crate-type = ["rlib"]
 [[bin]]
 path = "src/setup/main.rs"
 name = "libzeropool-setup"
-required-features = ["cli_libzeropool_setup"] 
+required-features = ["cli_libzeropool_setup"]
 
 [dependencies]
-fawkes-crypto = { version = "4.3.3", features = ["rand_support"] }
-
+fawkes-crypto = { git = "https://github.com/zeropoolnetwork/fawkes-crypto", branch = "fix/plonk-fixes", default-features = false, features = ["rand_support", "borsh_support", "serde_support"] }
 
 sha3 = "0.9.1"
 serde = { version = "1.0", features = ["derive"] }
@@ -27,14 +26,23 @@ lazy_static = "1.4.0"
 chacha20poly1305 = "0.8.0"
 clap={ package = "clap-v3", version = "3.0.0-beta.1", optional=true}
 convert_case = "0.4.0"
+near-halo2-verifier = { git = "https://github.com/zeropoolnetwork/near-halo2-verifier", branch = "master", optional = true }
 
 [features]
 in1out127=[]
 in3out127=[]
 in7ount127=[]
 in15out127=[]
-cli_libzeropool_setup = ["clap", "fawkes-crypto/rand_support", "fawkes-crypto/backend_bellman_groth16"]
-default=["cli_libzeropool_setup", "in3out127"]
+cli_libzeropool_setup = ["clap"]
+default=["in3out127"]
+plonk=["fawkes-crypto/plonk", "near-halo2-verifier"]
+groth16=["fawkes-crypto/r1cs", "fawkes-crypto/backend_bellman_groth16"]
 
 [dev-dependencies]
-fawkes-crypto = { version = "4.3.3", features = ["rand_support", "backend_bellman_groth16"] }
+fawkes-crypto = { git = "https://github.com/zeropoolnetwork/fawkes-crypto", branch = "fix/plonk-fixes", default-features = false, features = ["rand_support", "borsh_support", "serde_support"] }
+
+[patch."https://github.com/privacy-scaling-explorations/halo2curves"]
+halo2curves = { git = "https://github.com/zeropoolnetwork/halo2curves", branch = "zeropool-near" }
+
+[patch.crates-io]
+parity-secp256k1 = { git = "https://github.com/paritytech/rust-secp256k1" }

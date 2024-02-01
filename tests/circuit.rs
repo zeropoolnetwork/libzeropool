@@ -1,3 +1,5 @@
+#![cfg(feature = "r1cs")]
+
 use fawkes_crypto::circuit::cs::CS;
 use libzeropool::{
     fawkes_crypto::{

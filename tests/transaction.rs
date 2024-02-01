@@ -1,3 +1,5 @@
+#![cfg(feature = "r1cs")]
+
 use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_transfer},
     fawkes_crypto::{
         circuit::{
@@ -5,13 +7,25 @@ use libzeropool::{POOL_PARAMS, circuit::tx::{CTransferPub, CTransferSec, c_trans
         }, 
         core::signal::Signal,
         rand::thread_rng,
-        backend::bellman_groth16::{
-            engines::Bn256,
-            setup::setup,
-            prover,
-            verifier
-        }
+
     }, 
+};
+
+
+#[cfg(feature = "r1cs")]
+use libzeropool::fawkes_crypto::backend::bellman_groth16::{
+    engines::Bn256,
+    setup::setup,
+    prover,
+    verifier
+};
+
+#[cfg(feature = "plonk")]
+use libzeropool::fawkes_crypto::backend::plonk::{
+    engines::Bn256,
+    setup::setup,
+    prover,
+    verifier
 };
 
 use libzeropool::fawkes_crypto::engines::bn256::Fr;
